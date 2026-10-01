@@ -10,6 +10,8 @@ Right now the test setup is ready. The website itself is not implemented yet.
 
 ## Running the tests
 
+The test cases are written by AI.
+
 You need 64-bit PHP 8.5 and Composer. Install the dependencies and run the unit tests:
 
 ```sh
