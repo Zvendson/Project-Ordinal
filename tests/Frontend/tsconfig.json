@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "rootDir": "../..", "outDir": "../../.local/frontend-tests", "module": "CommonJS", "verbatimModuleSyntax": false },
+  "include": ["CounterTest.ts", "../../assets/ts/widgets/counter.ts"]
+}

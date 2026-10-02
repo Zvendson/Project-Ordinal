@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ES2022", "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "rootDir": "assets/ts", "outDir": "public/assets/scripts",
+    "strict": true, "noUncheckedIndexedAccess": true, "noImplicitReturns": true,
+    "noUnusedLocals": true, "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true, "noEmitOnError": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["assets/ts/**/*.ts"]
+}

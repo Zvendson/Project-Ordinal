@@ -1,0 +1,9 @@
+{
+  "name": "project-ordinal",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && php bin/build-assets.php",
+    "test": "tsc -p tests/Frontend/tsconfig.json && node .local/frontend-tests/tests/Frontend/CounterTest.js"
+  },
+  "devDependencies": { "typescript": "7.0.2" }
+}
