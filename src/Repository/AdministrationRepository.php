@@ -101,21 +101,23 @@ final readonly class AdministrationRepository
     }
 
     /**
-     * Records a fixed action and actor with optional stable device/credential IDs, without free-form details.
+     * Records a fixed action and actor with optional stable credential target IDs, without free-form details.
      *
      * @param int $actorId
      * @param string $action
      * @param ?int $projectId
      * @param ?int $deviceId
      * @param ?int $credentialId
+     * @param ?int $automationTokenId
      * @return void
      */
     public function recordEvent(
         int    $actorId,
         string $action,
-        ?int   $projectId    = null,
-        ?int   $deviceId     = null,
-        ?int   $credentialId = null,
+        ?int   $projectId         = null,
+        ?int   $deviceId          = null,
+        ?int   $credentialId      = null,
+        ?int   $automationTokenId = null,
     ): void
     {
         $details = [];
@@ -124,6 +126,9 @@ final readonly class AdministrationRepository
         }
         if ($credentialId !== null) {
             $details['credentialId'] = $credentialId;
+        }
+        if ($automationTokenId !== null) {
+            $details['automationTokenId'] = $automationTokenId;
         }
         $statement = $this->connection->prepare("INSERT INTO audit_events (user_id, project_id, action, outcome, details) VALUES (:user, :project, :action, 'success', CAST(:details AS JSONB))");
         $statement->execute(['user' => $actorId, 'project' => $projectId, 'action' => $action, 'details' => json_encode((object) $details, JSON_THROW_ON_ERROR)]);
