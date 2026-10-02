@@ -2,6 +2,7 @@
 /.phpunit.cache/
 /phpunit.xml
 /.local/
+/.ordinal/
 /.env
 /.env.*
 !/.env.example
