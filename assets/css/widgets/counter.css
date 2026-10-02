@@ -1,0 +1,2 @@
+[data-widget="counter"] [data-preview-status] { padding-inline: .25rem; }
+[data-widget="counter"] form:has(input[value="reset"]) { border-color: #9b6a10; }

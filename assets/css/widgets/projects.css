@@ -1,0 +1,2 @@
+[data-widget="projects"] > ul { list-style: none; padding: 0; display: grid; gap: .5rem; }
+[data-widget="projects"] > ul li { border: 1px solid var(--line); padding: .8rem 1rem; border-radius: .3rem; }

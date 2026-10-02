@@ -1,0 +1,49 @@
+:root {
+    color-scheme: light;
+    --ink: #203034;
+    --muted: #56676b;
+    --paper: #f3f5f3;
+    --panel: #ffffff;
+    --line: #ccd5d1;
+    --accent: #145e51;
+    --warning: #fff3ce;
+    --danger: #873923;
+    font-family: system-ui, sans-serif;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--paper);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+h1, h2, h3 { line-height: 1.25; overflow-wrap: anywhere; }
+h1 { font-size: 1.65rem; margin: 0; }
+h2 { font-size: 1.5rem; margin-top: 0; }
+h3 { margin-top: 2rem; }
+p, li { overflow-wrap: anywhere; }
+a { color: var(--accent); text-underline-offset: .2em; }
+a:hover { text-decoration-thickness: .15em; }
+:focus-visible { outline: 3px solid #b45917; outline-offset: 4px; }
+[hidden] { display: none !important; }
+form { padding: 1.25rem; margin: 1rem 0; border: 1px solid var(--line); border-radius: .5rem; background: var(--panel); }
+form p { margin: .75rem 0; }
+label { display: block; font-weight: 600; }
+input:not([type="hidden"]):not([type="checkbox"]), select, textarea {
+    display: block; width: min(100%, 32rem); padding: .65rem .75rem; margin-top: .35rem;
+    border: 1px solid #7b8c87; border-radius: .25rem; background: white; color: var(--ink); font: inherit;
+}
+input[type="checkbox"] { width: 1.2rem; height: 1.2rem; vertical-align: middle; accent-color: var(--accent); }
+button { min-height: 44px; padding: .6rem 1rem; border: 1px solid var(--accent); border-radius: .3rem; font: inherit; font-weight: 600; color: white; background: var(--accent); cursor: pointer; }
+button:hover { background: #104c42; }
+form[aria-busy="true"] { opacity: .75; }
+[role="status"]:empty { display: none; }
+[role="status"] { color: var(--accent); font-weight: 600; }
+.warning { padding: 1rem; border-left: 4px solid #9b6a10; background: var(--warning); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; vertical-align: top; padding: .75rem; border-bottom: 1px solid var(--line); }
+th { background: #e8efeb; }
+caption { text-align: left; padding: .75rem 0; color: var(--muted); }
+@media (max-width: 40rem) {
+    form { padding: 1rem; }
+    button { width: 100%; }
+    h1 { font-size: 1.4rem; }
+}
