@@ -226,6 +226,20 @@ final class ApplicationSchemaTest extends TestCase
     }
 
     /**
+     * Allows equal external repository IDs across connections but prevents duplicate projects.
+     *
+     * @return void
+     */
+    public function testEnforcesRepositoryProjectUniqueness(): void
+    {
+        $this->createProjectFixtures();
+        $this->assertRejectsSql("INSERT INTO projects (provider_connection_id, provider_repository_id, name) VALUES (1, '100', 'Duplicate')", '23505');
+        $this->connection->exec("INSERT INTO provider_connections (provider_kind, server_url, name) VALUES ('gitlab', 'https://gitlab.com', 'GitLab')");
+        $this->connection->exec("INSERT INTO projects (provider_connection_id, provider_repository_id, name) VALUES (2, '100', 'Other provider')");
+        self::assertSame(3, $this->connection->query('SELECT count(*) FROM projects')->fetchColumn());
+    }
+
+    /**
      * Creates two projects and users for relationship checks.
      *
      * @return void
