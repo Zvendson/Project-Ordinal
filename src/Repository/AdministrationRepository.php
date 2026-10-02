@@ -101,16 +101,31 @@ final readonly class AdministrationRepository
     }
 
     /**
-     * Records a fixed action name and actor without accepting free-form secrets.
+     * Records a fixed action and actor with optional stable device/credential IDs, without free-form details.
      *
      * @param int $actorId
      * @param string $action
      * @param ?int $projectId
+     * @param ?int $deviceId
+     * @param ?int $credentialId
      * @return void
      */
-    public function recordEvent(int $actorId, string $action, ?int $projectId = null): void
+    public function recordEvent(
+        int    $actorId,
+        string $action,
+        ?int   $projectId    = null,
+        ?int   $deviceId     = null,
+        ?int   $credentialId = null,
+    ): void
     {
-        $statement = $this->connection->prepare("INSERT INTO audit_events (user_id, project_id, action, outcome) VALUES (:user, :project, :action, 'success')");
-        $statement->execute(['user' => $actorId, 'project' => $projectId, 'action' => $action]);
+        $details = [];
+        if ($deviceId !== null) {
+            $details['deviceId'] = $deviceId;
+        }
+        if ($credentialId !== null) {
+            $details['credentialId'] = $credentialId;
+        }
+        $statement = $this->connection->prepare("INSERT INTO audit_events (user_id, project_id, action, outcome, details) VALUES (:user, :project, :action, 'success', CAST(:details AS JSONB))");
+        $statement->execute(['user' => $actorId, 'project' => $projectId, 'action' => $action, 'details' => json_encode((object) $details, JSON_THROW_ON_ERROR)]);
     }
 }

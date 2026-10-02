@@ -39,11 +39,15 @@ final readonly class ProjectRepository
      * Finds stable project identity and current archive/connection state.
      *
      * @param int $id
+     * @param bool $isLocked
      * @return ?array
      */
-    public function findProject(int $id): ?array
+    public function findProject(int $id, bool $isLocked = false): ?array
     {
-        $statement = $this->connection->prepare('SELECT p.*, c.disabled_at AS connection_disabled_at FROM projects p JOIN provider_connections c ON c.id = p.provider_connection_id WHERE p.id = :id');
+        $statement = $this->connection->prepare('SELECT p.*, c.disabled_at AS connection_disabled_at,
+            COALESCE(p.authentication_required_override, s.is_authentication_required) AS is_authentication_required,
+            COALESCE(p.device_lifetime_days_override, s.device_lifetime_days) AS device_lifetime_days
+            FROM projects p JOIN provider_connections c ON c.id = p.provider_connection_id CROSS JOIN instance_settings s WHERE p.id = :id AND s.id = 1' . ($isLocked ? ' FOR SHARE OF p' : ''));
         $statement->execute(['id' => $id]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $row;
