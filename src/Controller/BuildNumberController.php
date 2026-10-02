@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Ordinal\Controller;
 
 use JsonException;
-use LogicException;
+use Ordinal\Configuration\ConfigurationLoader;
+use Ordinal\Database\ConnectionFactory;
 use Ordinal\Http\ApiError;
 use Ordinal\Http\Response;
 use Ordinal\Security\AllocationAuthorizer;
 use Ordinal\Security\AuthenticationException;
 use Ordinal\Security\DenyingAllocationAuthorizer;
+use Ordinal\Service\AllocationException;
+use Ordinal\Service\BuildNumberService;
 use SensitiveParameter;
 use stdClass;
 
@@ -23,24 +26,27 @@ final class BuildNumberController
     private const string BEARER_PATTERN = '/^Bearer ([A-Za-z0-9\-._~+\/]+=*)$/iD';
 
     /**
-     * Uses the denying authorizer until real credential verification is available.
+     * Uses denying authorization by default and opens the database only after acceptance.
      *
      * @param AllocationAuthorizer $authorizer
+     * @param ?BuildNumberService $service
      */
     public function __construct(
         /** Verifies allocation permissions before business logic can run. */
         private readonly AllocationAuthorizer $authorizer = new DenyingAllocationAuthorizer(),
+        /** Supplies a transaction service or lets an authorized request create one lazily. */
+        private readonly ?BuildNumberService  $service    = null,
     ) {}
 
     /**
-     * Validates project/JSON/UUID input and rejects unauthorized allocation requests.
+     * Returns an allocation/replay response only after input validation and authorization.
      *
      * @param string $projectId
      * @param string $body
      * @param ?string $authorizationHeader
      * @param ?string $contentType
      * @return Response
-     * @throws LogicException
+     * @throws \Throwable
      */
     public function createBuildNumber(
         string  $projectId,
@@ -75,12 +81,21 @@ final class BuildNumberController
         }
 
         try {
-            $this->authorizer->authorizeAllocation($parsedProjectId, $bearerToken);
+            $caller      = $this->authorizer->authorizeAllocation($parsedProjectId, $bearerToken);
+            $requestId   = $request->requestId;
+            $service     = $this->service ?? new BuildNumberService(
+                ConnectionFactory::createConnection(ConfigurationLoader::loadFromEnvironment()),
+            );
+            $buildNumber = $service->allocateBuildNumber($parsedProjectId, $requestId, $caller);
         } catch (AuthenticationException) {
             return ApiError::createResponse('INVALID_AUTHENTICATION');
+
         }
 
-        // Transactional allocation is introduced in the next guide step.
-        throw new LogicException('Allocation service is not available.');
+        return Response::createJson([
+            'projectId'   => $parsedProjectId,
+            'requestId'   => $requestId,
+            'buildNumber' => $buildNumber,
+        ]);
     }
 }
