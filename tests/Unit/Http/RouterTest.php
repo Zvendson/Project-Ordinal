@@ -11,6 +11,35 @@ use PHPUnit\Framework\TestCase;
 final class RouterTest extends TestCase
 {
     /**
+     * Routes the POST allocation path and forwards its input.
+     *
+     * @return void
+     */
+    public function testRoutesAllocationRequests(): void
+    {
+        $response = (new Router())->dispatch('POST', '/api/projects/1/build-numbers?source=test',
+            '{"requestId":"11111111-1111-4111-8111-111111111111"}', 'Bearer unknown', 'application/json',
+        );
+        self::assertSame(401, $response->statusCode);
+        self::assertSame('INVALID_AUTHENTICATION', json_decode($response->body, true, flags: JSON_THROW_ON_ERROR)['error']['code']);
+        self::assertSame(400, (new Router())->dispatch('POST', '/api/projects/1/build-numbers', '{', null, 'application/json')->statusCode);
+        self::assertSame(400, (new Router())->dispatch('POST', '/api/projects/{projectId}/build-numbers', '{}', null, 'application/json')->statusCode);
+    }
+
+    /**
+     * Returns a JSON method error for the allocation path with POST as its allowed method.
+     *
+     * @return void
+     */
+    public function testRejectsAllocationReadRequests(): void
+    {
+        $response = (new Router())->dispatch('GET', '/api/projects/1/build-numbers');
+        self::assertSame(405, $response->statusCode);
+        self::assertSame('POST', $response->headers['Allow']);
+        self::assertSame('METHOD_NOT_ALLOWED', json_decode($response->body, true, flags: JSON_THROW_ON_ERROR)['error']['code']);
+    }
+
+    /**
      * Dispatches the home endpoint through its controller.
      *
      * @return void
