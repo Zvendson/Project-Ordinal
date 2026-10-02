@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ordinal\Security;
 
+use Ordinal\Model\AllocationCaller;
 use SensitiveParameter;
 
 /** Rejects every allocation until credential verification is implemented. */
@@ -14,14 +15,14 @@ final class DenyingAllocationAuthorizer extends AllocationAuthorizer
      *
      * @param int $projectId
      * @param ?string $bearerToken
-     * @return void
+     * @return AllocationCaller
      * @throws AuthenticationException
      */
     public function authorizeAllocation(
         int     $projectId,
         #[SensitiveParameter]
         ?string $bearerToken,
-    ): void {
+    ): AllocationCaller {
         throw new AuthenticationException();
     }
 }

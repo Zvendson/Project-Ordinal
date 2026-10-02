@@ -7,22 +7,27 @@ namespace Ordinal\Tests\Unit\Controller;
 use Ordinal\Controller\BuildNumberController;
 use Ordinal\Security\AllocationAuthorizer;
 use Ordinal\Security\AuthenticationException;
+use Ordinal\Service\BuildNumberService;
+use PDO;
 use PHPUnit\Framework\TestCase;
 
 /** Verifies allocation input validation and the authorization boundary. */
 final class BuildNumberControllerTest extends TestCase
 {
     /**
-     * Keeps allocation unavailable even when a test authorizer accepts a request.
+     * Stops rejected requests before opening an allocation transaction.
      *
      * @return void
      */
-    public function testDoesNotAllocateBeforeServiceExists(): void
+    public function testRejectsBeforeOpeningTransaction(): void
     {
         $authorizer = $this->createMock(AllocationAuthorizer::class);
-        $authorizer->expects(self::once())->method('authorizeAllocation');
-        $this->expectException(\LogicException::class);
-        (new BuildNumberController($authorizer))->createBuildNumber('1', self::REQUEST_BODY, null, 'application/json');
+        $authorizer->expects(self::once())->method('authorizeAllocation')->willThrowException(new AuthenticationException());
+        $connection = $this->createMock(PDO::class);
+        $connection->expects(self::never())->method('beginTransaction');
+        $response = (new BuildNumberController($authorizer, new BuildNumberService($connection)))
+            ->createBuildNumber('1', self::REQUEST_BODY, null, 'application/json');
+        self::assertSame(401, $response->statusCode);
     }
 
     /** Names a valid UUID v4 request for these tests. */
