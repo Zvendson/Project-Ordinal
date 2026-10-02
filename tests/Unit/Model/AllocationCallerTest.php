@@ -39,4 +39,19 @@ final class AllocationCallerTest extends TestCase
             }
         }
     }
+
+    /** @return void Keeps a verified hash only with an automation actor and rejects malformed proofs. */
+    public function testValidatesAutomationHashProof(): void
+    {
+        $hash = str_repeat('a', 64);
+        self::assertSame($hash, (new AllocationCaller(automationTokenId: 1, automationSecretHash: $hash))->automationSecretHash);
+        foreach ([[null, $hash], [1, 'short'], [1, str_repeat('A', 64)]] as [$id, $proof]) {
+            try {
+                new AllocationCaller(automationTokenId: $id, automationSecretHash: $proof);
+                self::fail('Invalid verified hash was accepted.');
+            } catch (InvalidArgumentException) {
+                self::assertTrue(true);
+            }
+        }
+    }
 }
