@@ -13,29 +13,37 @@ use Ordinal\Model\SecurityConfiguration;
 use Ordinal\Repository\AdministrationRepository;
 use Ordinal\Repository\AuthorizationRepository;
 use Ordinal\Repository\BrowserSessionRepository;
+use Ordinal\Repository\DeviceRepository;
 use Ordinal\Repository\IdentityRepository;
 use Ordinal\Repository\LoginRepository;
 use Ordinal\Repository\ProjectRepository;
 use Ordinal\Repository\ProviderConnectionRepository;
 use Ordinal\Security\TokenCipher;
+use Ordinal\Security\DeviceAllocationAuthorizer;
 use PDO;
 use SensitiveParameter;
 
-/** Composes account services lazily for account routes while preserving public/API defaults. */
+/** Composes account and device services on one request-scoped database connection. */
 final readonly class AccountApplication
 {
     /** Resolves allowed concrete provider integrations. */
-    public ProviderRegistry      $providers;
+    public ProviderRegistry           $providers;
     /** Coordinates encrypted reusable credentials. */
-    public AuthorizationService  $authorizations;
+    public AuthorizationService       $authorizations;
     /** Manages opaque server-side browser sessions. */
-    public BrowserSessionService $sessions;
+    public BrowserSessionService      $sessions;
     /** Coordinates state/PKCE callbacks. */
-    public LoginService          $login;
+    public LoginService               $login;
     /** Protects instance grants and connection/session configuration. */
-    public AdministrationService $administration;
+    public AdministrationService      $administration;
     /** Links immutable repositories and checks current project roles. */
-    public ProjectService        $projects;
+    public ProjectService             $projects;
+    /** Manages provider-approved project credentials and revocation. */
+    public DeviceService              $devices;
+    /** Verifies device credentials and live repository write permission. */
+    public DeviceAllocationAuthorizer $allocationAuthorizer;
+    /** Allocates and consumes single-use credentials atomically. */
+    public BuildNumberService         $buildNumbers;
 
     /**
      * Wires domain repositories and services using one request-scoped database connection.
@@ -63,6 +71,11 @@ final readonly class AccountApplication
         $this->authorizations = new AuthorizationService($connection, $authorizationRepository, $this->providers);
         $this->login = new LoginService($connection, $this->providers, new LoginRepository($connection), $identities, $authorizationRepository, $this->sessions, $this->administration, $cipher);
         $this->projects = new ProjectService(new ProjectRepository($connection), $this->providers, $this->authorizations, $this->sessions, $this->administration, $administrationRepository);
+        $deviceRepository = new DeviceRepository($connection);
+        $access = new RepositoryAccessService($identities, $this->providers, $this->authorizations);
+        $this->devices = new DeviceService($connection, $deviceRepository, $access, $this->sessions, $this->administration, $administrationRepository, $this->projects);
+        $this->allocationAuthorizer = new DeviceAllocationAuthorizer($deviceRepository, $access);
+        $this->buildNumbers = new BuildNumberService($connection);
     }
 
     /**

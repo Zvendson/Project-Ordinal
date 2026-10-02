@@ -12,6 +12,7 @@ use Ordinal\Http\Response;
 use Ordinal\Security\AllocationAuthorizer;
 use Ordinal\Security\AuthenticationException;
 use Ordinal\Security\DenyingAllocationAuthorizer;
+use Ordinal\Security\RuntimeAllocationAuthorizer;
 use Ordinal\Service\AllocationException;
 use Ordinal\Service\BuildNumberService;
 use SensitiveParameter;
@@ -83,9 +84,9 @@ final class BuildNumberController
         try {
             $caller      = $this->authorizer->authorizeAllocation($parsedProjectId, $bearerToken);
             $requestId   = strtolower($request->requestId);
-            $service     = $this->service ?? new BuildNumberService(
-                ConnectionFactory::createConnection(ConfigurationLoader::loadFromEnvironment()),
-            );
+            $service     = $this->service ?? ($this->authorizer instanceof RuntimeAllocationAuthorizer
+                ? $this->authorizer->getBuildNumberService()
+                : new BuildNumberService(ConnectionFactory::createConnection(ConfigurationLoader::loadFromEnvironment())));
             $buildNumber = $service->allocateBuildNumber($parsedProjectId, $requestId, $caller);
         } catch (AuthenticationException) {
             return ApiError::createResponse('INVALID_AUTHENTICATION');
