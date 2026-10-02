@@ -62,4 +62,47 @@ final readonly class ProjectRepository
     {
         return $this->connection->query('SELECT p.*, c.disabled_at AS connection_disabled_at FROM projects p JOIN provider_connections c ON c.id = p.provider_connection_id ORDER BY p.id')->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Changes a locked counter without clearing the permanent ever-allocated flag.
+     *
+     * @param int $id
+     * @param int $number
+     * @return void
+     */
+    public function saveCounter(int $id, int $number): void
+    {
+        $statement = $this->connection->prepare('UPDATE projects SET next_build_number = :number, is_exhausted = FALSE WHERE id = :id');
+        $statement->execute(['number' => $number, 'id' => $id]);
+    }
+
+    /**
+     * Changes only contributor visibility; recording continues regardless.
+     *
+     * @param int $id
+     * @param bool $isVisible
+     * @return void
+     */
+    public function saveHistoryVisibility(int $id, bool $isVisible): void
+    {
+        $statement = $this->connection->prepare('UPDATE projects SET is_other_history_visible = :visible WHERE id = :id');
+        $statement->bindValue('visible', $isVisible, PDO::PARAM_BOOL);
+        $statement->bindValue('id', $id, PDO::PARAM_INT);
+        $statement->execute();
+    }
+
+    /**
+     * Archives/reactivates a stable project instead of deleting referenced records.
+     *
+     * @param int $id
+     * @param bool $isArchived
+     * @return void
+     */
+    public function saveArchiveState(int $id, bool $isArchived): void
+    {
+        $statement = $this->connection->prepare('UPDATE projects SET archived_at = CASE WHEN :archived THEN clock_timestamp() ELSE NULL END WHERE id = :id');
+        $statement->bindValue('archived', $isArchived, PDO::PARAM_BOOL);
+        $statement->bindValue('id', $id, PDO::PARAM_INT);
+        $statement->execute();
+    }
 }

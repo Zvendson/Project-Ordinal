@@ -82,16 +82,20 @@ final readonly class ProjectService
      *
      * @param BrowserSession $session
      * @param int $projectId
+     * @param bool $canReadInactive
      * @return RepositoryPermissions
      */
-    public function checkPermissions(BrowserSession $session, int $projectId): RepositoryPermissions
+    public function checkPermissions(BrowserSession $session, int $projectId, bool $canReadInactive = false): RepositoryPermissions
     {
         $session = $this->sessions->requireActiveSession($session);
         $project = $this->repository->findProject($projectId);
         if ($project === null) {
             throw new AccountException('Project not found.', 404);
         }
-        if ($project['archived_at'] !== null || $project['connection_disabled_at'] !== null) {
+        if ($canReadInactive && $this->administration->isInstanceAdministrator($session->userId)) {
+            return new RepositoryPermissions(true, true);
+        }
+        if ((!$canReadInactive && $project['archived_at'] !== null) || $project['connection_disabled_at'] !== null) {
             return new RepositoryPermissions();
         }
         if ($this->administration->isInstanceAdministrator($session->userId)) {
@@ -136,7 +140,7 @@ final readonly class ProjectService
      */
     public function getProject(BrowserSession $session, int $projectId): array
     {
-        $permissions = $this->checkPermissions($session, $projectId);
+        $permissions = $this->checkPermissions($session, $projectId, true);
         if (!$permissions->canAllocateBuildNumber) {
             throw new AccountException('Repository access is required.');
         }
