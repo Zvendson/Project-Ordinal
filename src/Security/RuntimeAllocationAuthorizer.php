@@ -6,7 +6,7 @@ namespace Ordinal\Security;
 
 use InvalidArgumentException;
 use Ordinal\Model\AllocationCaller;
-use Ordinal\Service\AccountApplication;
+use Ordinal\Service\ManagementApplication;
 use Ordinal\Service\AllocationException;
 use Ordinal\Service\BuildNumberService;
 use SensitiveParameter;
@@ -34,18 +34,18 @@ final class RuntimeAllocationAuthorizer extends AllocationAuthorizer
      */
     public function getAuditRepository(): \Ordinal\Repository\AuditRepository
     {
-        $this->application ??= AccountApplication::createFromEnvironment();
+        $this->application ??= ManagementApplication::createFromEnvironment();
         return $this->application->audit;
     }
     /**
      * Accepts trusted transport context and optional request-scoped services.
      *
-     * @param ?AccountApplication $application
+     * @param ?ManagementApplication $application
      * @param bool $isSecure
      */
     public function __construct(
         /** Holds services only after a valid request needs application configuration. */
-        private ?AccountApplication $application = null,
+        private ?ManagementApplication $application = null,
         /** Indicates trusted HTTPS rather than an untrusted forwarded header. */
         private readonly bool       $isSecure    = false,
     ) {}
@@ -68,9 +68,9 @@ final class RuntimeAllocationAuthorizer extends AllocationAuthorizer
             throw new AuthenticationException('Allocation requires HTTPS.');
         }
         try {
-            $this->application ??= AccountApplication::createFromEnvironment();
+            $this->application ??= ManagementApplication::createFromEnvironment();
         } catch (InvalidArgumentException) {
-            throw new AllocationException(AllocationException::PROVIDER_UNAVAILABLE);
+            throw new AllocationException('INTERNAL_ERROR');
         }
         $this->hasCheckedCaller = true;
         return $this->application->allocationAuthorizer->authorizeAllocation($projectId, $bearerToken);

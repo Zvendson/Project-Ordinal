@@ -4,146 +4,230 @@ declare(strict_types=1);
 
 namespace Ordinal\Service;
 
-use Ordinal\Model\BrowserSession;
-use Ordinal\Model\ProviderIdentity;
-use Ordinal\Model\ProviderRepository;
-use Ordinal\Model\RepositoryPermissions;
-use Ordinal\Repository\AdministrationRepository;
+use Ordinal\Database\Transaction;
+use Ordinal\Repository\AuditRepository;
 use Ordinal\Repository\ProjectRepository;
+use PDO;
 
-/** Creates protected repository links and derives project access from current provider permissions. */
+/** Manages independent projects and serializes counter changes with build allocation. */
 final readonly class ProjectService
 {
+    /** Bounds all counter values to uint32. */
+    private const int MAX_BUILD_NUMBER = 4294967295;
+    /** Bounds names shown throughout the interface. */
+    private const int MAX_NAME_BYTES = 200;
+    /** Bounds optional repository links. */
+    private const int MAX_URL_BYTES = 2048;
+
     /**
-     * Composes current permission checks and atomic project creation.
+     * Uses shared persistence and audit in each management transaction.
      *
+     * @param PDO $connection
      * @param ProjectRepository $repository
-     * @param ProviderRegistry $providers
-     * @param AuthorizationService $authorizations
-     * @param BrowserSessionService $sessions
-     * @param AdministrationService $administration
-     * @param AdministrationRepository $audit
+     * @param AuditRepository $audit
      */
     public function __construct(
-        /** Persists linked project identities and counters. */
-        private ProjectRepository        $repository,
-        /** Resolves active configured provider connections. */
-        private ProviderRegistry         $providers,
-        /** Obtains the current encrypted/rotated user authorization. */
-        private AuthorizationService     $authorizations,
-        /** Rejects stale browser sessions. */
-        private BrowserSessionService    $sessions,
-        /** Restricts project creation to instance administrators. */
-        private AdministrationService    $administration,
-        /** Records project creation in the same transaction. */
-        private AdministrationRepository $audit,
+        /** Owns project mutation transactions. */
+        private PDO               $connection,
+        /** Reads and writes project data. */
+        private ProjectRepository $repository,
+        /** Records administrative changes atomically. */
+        private AuditRepository   $audit,
     ) {}
 
     /**
-     * Creates a project for a repository verified through the selected provider identity.
+     * Creates a named project with an optional URL; never contacts its hosting provider.
      *
-     * @param BrowserSession $session
-     * @param int $connectionId
-     * @param string $repositoryId
      * @param string $name
+     * @param ?string $repositoryUrl
      * @return int
      */
-    public function createProject(BrowserSession $session, int $connectionId, string $repositoryId, string $name): int
+    public function createProject(string $name, ?string $repositoryUrl = null): int
     {
-        $this->administration->requireInstanceAdministrator($session);
-        if (trim($name) === '' || preg_match('/^[1-9][0-9]*$/D', $repositoryId) !== 1) {
-            throw new AccountException('Choose an immutable repository ID and a project name.', 400);
-        }
-        if ($session->providerConnectionId !== $connectionId) {
-            throw new AccountException('Sign in through the selected repository provider before linking it.');
-        }
-        $provider = $this->providers->createProvider($connectionId);
-        $authorization = $this->authorizations->getAuthorization($session->userId);
-        $repository = $provider->findRepository($authorization, $repositoryId);
+        $name = $this->requireName($name);
+        $url = $this->normalizeRepositoryUrl($repositoryUrl);
         $id = 0;
-        $this->administration->executeMutation($session,
-            /**
-             * Rechecks current instance rights and commits the immutable link with its audit event.
+        (new Transaction($this->connection))->execute(/**
+             * Runs the operation on the transaction connection.
              *
-             * @param BrowserSession $current
+             * @param PDO $connection
              * @return void
              */
-            function (BrowserSession $current) use ($repository, $name, &$id): void {
-                $this->providers->createProvider($repository->providerConnectionId);
-                $id = $this->repository->createProject($repository, trim($name)) ?? throw new AccountException('This repository already has a project.', 409);
-                $this->audit->recordEvent($current->userId, 'project_created', $id);
-            },
-        );
+            function (PDO $connection) use ($name, $url, &$id): void {
+            $id = $this->repository->createProject($name, $url);
+            $this->audit->recordEvent(null, $id, 'project_created');
+        });
         return $id;
     }
 
     /**
-     * Computes project rights on each request without granting cross-provider identity access.
+     * Lists all projects for the authenticated local administrator.
      *
-     * @param BrowserSession $session
-     * @param int $projectId
-     * @param bool $canReadInactive
-     * @return RepositoryPermissions
+     * @return array
      */
-    public function checkPermissions(BrowserSession $session, int $projectId, bool $canReadInactive = false): RepositoryPermissions
+    public function findProjects(): array { return $this->repository->findProjects(); }
+
+    /**
+     * Returns an existing project or a fixed not-found error.
+     *
+     * @param int $id
+     * @return array
+     */
+    public function getProject(int $id): array
     {
-        $session = $this->sessions->requireActiveSession($session);
-        $project = $this->repository->findProject($projectId);
-        if ($project === null) {
-            throw new AccountException('Project not found.', 404);
-        }
-        if ($canReadInactive && $this->administration->isInstanceAdministrator($session->userId)) {
-            return new RepositoryPermissions(true, true);
-        }
-        if ((!$canReadInactive && $project['archived_at'] !== null) || $project['connection_disabled_at'] !== null) {
-            return new RepositoryPermissions();
-        }
-        if ($this->administration->isInstanceAdministrator($session->userId)) {
-            return new RepositoryPermissions(true, true);
-        }
-        if ($session->providerConnectionId !== (int) $project['provider_connection_id']) {
-            return new RepositoryPermissions();
-        }
-        $provider = $this->providers->createProvider($session->providerConnectionId);
-        $authorization = $this->authorizations->getAuthorization($session->userId);
-        return $provider->checkRepositoryPermissions($authorization, new ProviderIdentity($session->providerConnectionId, $session->providerUserId, '', $session->displayName), new ProviderRepository($session->providerConnectionId, $project['provider_repository_id'], $project['name']));
+        return $this->repository->findProject($id) ?? throw new AccountException('Project not found.', 404);
     }
 
     /**
-     * Lists only projects accessible to the current provider-qualified browser identity.
+     * Edits project name/link without changing its counter or token scope.
      *
-     * @param BrowserSession $session
-     * @return array
+     * @param int $id
+     * @param string $name
+     * @param ?string $repositoryUrl
+     * @return void
      */
-    public function findVisibleProjects(BrowserSession $session): array
+    public function saveProject(int $id, string $name, ?string $repositoryUrl): void
     {
-        $this->sessions->requireActiveSession($session);
-        $visible = [];
-        foreach ($this->repository->findProjects() as $project) {
-            if ($this->administration->isInstanceAdministrator($session->userId)) {
-                $visible[] = $project;
-                continue;
-            }
-            if ((int) $project['provider_connection_id'] === $session->providerConnectionId && $this->checkPermissions($session, (int) $project['id'])->canAllocateBuildNumber) {
-                $visible[] = $project;
-            }
-        }
-        return $visible;
+        $name = $this->requireName($name);
+        $url = $this->normalizeRepositoryUrl($repositoryUrl);
+        (new Transaction($this->connection))->execute(/**
+             * Runs the operation on the transaction connection.
+             *
+             * @param PDO $connection
+             * @return void
+             */
+            function (PDO $connection) use ($id, $name, $url): void {
+            $this->requireActiveProject($id);
+            $this->repository->saveProject($id, $name, $url);
+            $this->audit->recordEvent(null, $id, 'project_updated');
+        });
     }
 
     /**
-     * Returns project data only after current contributor/administrator access is established.
+     * Allows initial counter edits and later increases without accidental number reuse.
      *
-     * @param BrowserSession $session
-     * @param int $projectId
+     * @param int $id
+     * @param int $number
+     * @return void
+     */
+    public function saveCounter(int $id, int $number): void
+    {
+        $this->requireNumber($number);
+        (new Transaction($this->connection))->execute(/**
+             * Runs the operation on the transaction connection.
+             *
+             * @param PDO $connection
+             * @return void
+             */
+            function (PDO $connection) use ($id, $number): void {
+            $project = $this->requireActiveProject($id);
+            if ($project['has_allocated_build_number'] && ($project['is_exhausted'] || $number <= $project['next_build_number'])) {
+                throw new AccountException('After a build, choose a greater number or use the confirmed reset.', 400);
+            }
+            $this->repository->saveCounter($id, $number);
+            $this->audit->recordEvent(null, $id, 'counter_updated', ['nextBuildNumber' => $number]);
+        });
+    }
+
+    /**
+     * Resets a counter only after explicit name/reuse confirmation; preserves permanent retries.
+     *
+     * @param int $id
+     * @param int $number
+     * @param string $projectName
+     * @param bool $isReuseConfirmed
+     * @return void
+     */
+    public function resetCounter(int $id, int $number, string $projectName, bool $isReuseConfirmed): void
+    {
+        $this->requireNumber($number);
+        (new Transaction($this->connection))->execute(/**
+             * Runs the operation on the transaction connection.
+             *
+             * @param PDO $connection
+             * @return void
+             */
+            function (PDO $connection) use ($id, $number, $projectName, $isReuseConfirmed): void {
+            $project = $this->requireActiveProject($id);
+            if (!$isReuseConfirmed || $projectName !== $project['name']) { throw new AccountException('Confirm the project name and number reuse before resetting.', 400); }
+            $this->repository->saveCounter($id, $number);
+            $this->audit->recordEvent(null, $id, 'counter_reset', ['nextBuildNumber' => $number]);
+        });
+    }
+
+    /**
+     * Archives/reactivates without deleting counters, tokens or retry records.
+     *
+     * @param int $id
+     * @param bool $isArchived
+     * @return void
+     */
+    public function saveArchiveState(int $id, bool $isArchived): void
+    {
+        (new Transaction($this->connection))->execute(/**
+             * Runs the operation on the transaction connection.
+             *
+             * @param PDO $connection
+             * @return void
+             */
+            function (PDO $connection) use ($id, $isArchived): void {
+            if ($this->repository->findProject($id, true) === null) { throw new AccountException('Project not found.', 404); }
+            $this->repository->saveArchiveState($id, $isArchived);
+            $this->audit->recordEvent(null, $id, $isArchived ? 'project_archived' : 'project_reactivated');
+        });
+    }
+
+    /**
+     * Obtains the same project lock used by allocation and rejects archived projects.
+     *
+     * @param int $id
      * @return array
      */
-    public function getProject(BrowserSession $session, int $projectId): array
+    private function requireActiveProject(int $id): array
     {
-        $permissions = $this->checkPermissions($session, $projectId, true);
-        if (!$permissions->canAllocateBuildNumber) {
-            throw new AccountException('Repository access is required.');
-        }
-        return ['project' => $this->repository->findProject($projectId), 'permissions' => $permissions];
+        $project = $this->repository->findProject($id, true);
+        if ($project === null || $project['archived_at'] !== null) { throw new AccountException('Active project not found.', 404); }
+        return $project;
+    }
+
+    /**
+     * Rejects empty/oversized names instead of silently truncating them.
+     *
+     * @param string $name
+     * @return string
+     */
+    private function requireName(string $name): string
+    {
+        $name = trim($name);
+        if ($name === '' || strlen($name) > self::MAX_NAME_BYTES) { throw new AccountException('Choose a project name up to 200 bytes.', 400); }
+        return $name;
+    }
+
+    /**
+     * Accepts optional HTTP(S) repository links without embedded credentials or fetching them.
+     *
+     * @param ?string $url
+     * @return ?string
+     */
+    private function normalizeRepositoryUrl(?string $url): ?string
+    {
+        $url = trim($url ?? '');
+        if ($url === '') { return null; }
+        $parts = parse_url($url);
+        if (strlen($url) > self::MAX_URL_BYTES || filter_var($url, FILTER_VALIDATE_URL) === false || $parts === false
+            || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) || empty($parts['host'])
+            || isset($parts['user']) || isset($parts['pass'])) { throw new AccountException('Use a valid repository URL, or leave it empty.', 400); }
+        return $url;
+    }
+
+    /**
+     * Requires the inclusive uint32 counter range.
+     *
+     * @param int $number
+     * @return void
+     */
+    private function requireNumber(int $number): void
+    {
+        if ($number < 0 || $number > self::MAX_BUILD_NUMBER) { throw new AccountException('Choose a number from 0 to 4294967295.', 400); }
     }
 }

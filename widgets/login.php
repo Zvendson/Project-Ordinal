@@ -1,19 +1,14 @@
 <?php
 
-/** Displays configured provider choices without client secrets. */
-
+/** Displays the single administrator password form with browser-bound CSRF. */
 declare(strict_types=1);
 
 use Ordinal\View\TemplateRenderer;
 ?>
-<h2>Sign in</h2>
-<p>Your account belongs to the provider you choose. Accounts from different servers stay separate.</p>
-<ul>
-<?php foreach ($data['connections'] as $connection): ?>
-    <li><a href="/login/start?connectionId=<?= (int) $connection['id'] ?>"><?= TemplateRenderer::escape($connection['name']) ?></a></li>
-<?php endforeach; ?>
-</ul>
-<?php if ($data['connections'] === []): ?>
-<p>No provider connections are available. Contact the server operator.</p>
-<?php endif; ?>
-<p><a href="/">Home</a></p>
+<h2>Administrator sign in</h2>
+<p>Use the administrator password configured for this installation.</p>
+<form method="post" action="/login">
+    <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($data['session']->csrfToken) ?>">
+    <p><label>Administrator password <input type="password" name="password" autocomplete="current-password" required></label></p>
+    <button type="submit">Sign in</button>
+</form>

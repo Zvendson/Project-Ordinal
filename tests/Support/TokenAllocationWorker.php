@@ -9,8 +9,8 @@ use Ordinal\Model\AllocationCaller;
 use Ordinal\Security\AuthenticationException;
 use Ordinal\Service\BuildNumberService;
 
-/** Runs previously verified automation callers on independent guarded database connections. */
-final class AutomationAllocationWorker
+/** Runs previously verified project-token callers on independent guarded database connections. */
+final class TokenAllocationWorker
 {
     /**
      * Reports allocation or invalidation after waiting for the token lock.
@@ -23,8 +23,8 @@ final class AutomationAllocationWorker
      */
     public static function allocate(string $schemaName, int $tokenId, string $hash, string $requestId): string
     {
-        if (preg_match('/^automation_test_[a-f0-9]{16}$/D', $schemaName) !== 1) {
-            throw new InvalidArgumentException('Workers require an isolated automation test schema.');
+        if (preg_match('/^management_fixture_[a-f0-9]{16}$/D', $schemaName) !== 1) {
+            throw new InvalidArgumentException('Workers require an isolated management test schema.');
         }
         $connection = TestDatabase::createConnection();
         $connection->exec('SET search_path TO ' . $schemaName);

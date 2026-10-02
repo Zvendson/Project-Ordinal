@@ -1,7 +1,9 @@
 <?php
 
-/** Delegates the showProjects browser endpoint to its account controller. */
+/** Delegates the showProjects action to local management. */
 
 declare(strict_types=1);
 
-return (new \Ordinal\Controller\AccountController($this->accountApplication))->handle('showProjects', $query, $fields, $cookies, $isSecure);
+use Ordinal\Controller\ManagementController;
+
+return (new ManagementController($this->managementApplication))->handle('showProjects', $query, $fields, $cookies, $isSecure, $_SERVER['REMOTE_ADDR'] ?? 'local');

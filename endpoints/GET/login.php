@@ -1,7 +1,9 @@
 <?php
 
-/** Delegates the showLogin browser endpoint to its account controller. */
+/** Delegates the showLogin action to local management. */
 
 declare(strict_types=1);
 
-return (new \Ordinal\Controller\AccountController($this->accountApplication))->handle('showLogin', $query, $fields, $cookies, $isSecure);
+use Ordinal\Controller\ManagementController;
+
+return (new ManagementController($this->managementApplication))->handle('showLogin', $query, $fields, $cookies, $isSecure, $_SERVER['REMOTE_ADDR'] ?? 'local');

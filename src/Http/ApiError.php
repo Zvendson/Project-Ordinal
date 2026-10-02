@@ -16,7 +16,7 @@ final class ApiError
         'ACCESS_DENIED' => [Response::STATUS_FORBIDDEN, 'Access is denied.'],
         'PROJECT_NOT_FOUND' => [Response::STATUS_NOT_FOUND, 'Project not found.'],
         'BUILD_COUNTER_EXHAUSTED' => [Response::STATUS_CONFLICT, 'The build counter is exhausted.'],
-        'PROVIDER_UNAVAILABLE' => [Response::STATUS_SERVICE_UNAVAILABLE, 'Provider verification is temporarily unavailable.'],
+        'SERVICE_UNAVAILABLE' => [Response::STATUS_SERVICE_UNAVAILABLE, 'The build service is temporarily unavailable.'],
         'NOT_FOUND' => [Response::STATUS_NOT_FOUND, 'Endpoint not found.'],
         'METHOD_NOT_ALLOWED' => [Response::STATUS_METHOD_NOT_ALLOWED, 'Method not allowed.'],
         'INTERNAL_ERROR' => [Response::STATUS_INTERNAL_SERVER_ERROR, 'An unexpected error occurred.'],

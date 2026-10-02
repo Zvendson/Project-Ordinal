@@ -4,39 +4,37 @@ declare(strict_types=1);
 
 namespace Ordinal\Repository;
 
-use Ordinal\Model\ProviderRepository;
 use PDO;
 
-/** Links projects to immutable provider-qualified repositories without local role lists. */
+/** Stores independent projects; repository URLs are optional descriptive links. */
 final readonly class ProjectRepository
 {
     /**
-     * Uses application persistence for linked repositories.
+     * Uses the application's transaction connection.
      *
      * @param PDO $connection
      */
     public function __construct(
-        /** Stores project records and reads active connection metadata. */
+        /** Persists projects and counters. */
         private PDO $connection,
     ) {}
 
     /**
-     * Creates a link once; duplicates return null rather than changing an existing project.
+     * Creates a project without a provider account or repository identity.
      *
-     * @param ProviderRepository $repository
      * @param string $name
-     * @return ?int
+     * @param ?string $repositoryUrl
+     * @return int
      */
-    public function createProject(ProviderRepository $repository, string $name): ?int
+    public function createProject(string $name, ?string $repositoryUrl): int
     {
-        $statement = $this->connection->prepare('INSERT INTO projects (provider_connection_id, provider_repository_id, name) VALUES (:connection, :repository, :name) ON CONFLICT (provider_connection_id, provider_repository_id) DO NOTHING RETURNING id');
-        $statement->execute(['connection' => $repository->providerConnectionId, 'repository' => $repository->providerRepositoryId, 'name' => $name]);
-        $id = $statement->fetchColumn();
-        return $id === false ? null : (int) $id;
+        $statement = $this->connection->prepare('INSERT INTO projects (name, repository_url) VALUES (:name, :url) RETURNING id');
+        $statement->execute(['name' => $name, 'url' => $repositoryUrl]);
+        return (int) $statement->fetchColumn();
     }
 
     /**
-     * Finds stable project identity and current archive/connection state.
+     * Finds a project and optionally serializes mutations with allocations.
      *
      * @param int $id
      * @param bool $isLocked
@@ -44,27 +42,38 @@ final readonly class ProjectRepository
      */
     public function findProject(int $id, bool $isLocked = false): ?array
     {
-        $statement = $this->connection->prepare('SELECT p.*, c.disabled_at AS connection_disabled_at,
-            COALESCE(p.authentication_required_override, s.is_authentication_required) AS is_authentication_required,
-            COALESCE(p.device_lifetime_days_override, s.device_lifetime_days) AS device_lifetime_days
-            FROM projects p JOIN provider_connections c ON c.id = p.provider_connection_id CROSS JOIN instance_settings s WHERE p.id = :id AND s.id = 1' . ($isLocked ? ' FOR SHARE OF p' : ''));
+        $statement = $this->connection->prepare('SELECT * FROM projects WHERE id = :id' . ($isLocked ? ' FOR UPDATE' : ''));
         $statement->execute(['id' => $id]);
         $row = $statement->fetch(PDO::FETCH_ASSOC);
         return $row === false ? null : $row;
     }
 
     /**
-     * Lists candidate project records; permission filtering belongs to the service.
+     * Lists projects in stable creation order.
      *
      * @return array
      */
     public function findProjects(): array
     {
-        return $this->connection->query('SELECT p.*, c.disabled_at AS connection_disabled_at FROM projects p JOIN provider_connections c ON c.id = p.provider_connection_id ORDER BY p.id')->fetchAll(PDO::FETCH_ASSOC);
+        return $this->connection->query('SELECT * FROM projects ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
     }
 
     /**
-     * Changes a locked counter without clearing the permanent ever-allocated flag.
+     * Saves descriptive project fields independently from its stable ID and retries.
+     *
+     * @param int $id
+     * @param string $name
+     * @param ?string $repositoryUrl
+     * @return void
+     */
+    public function saveProject(int $id, string $name, ?string $repositoryUrl): void
+    {
+        $statement = $this->connection->prepare('UPDATE projects SET name = :name, repository_url = :url WHERE id = :id');
+        $statement->execute(['id' => $id, 'name' => $name, 'url' => $repositoryUrl]);
+    }
+
+    /**
+     * Updates a locked counter while retaining its permanent allocation flag.
      *
      * @param int $id
      * @param int $number
@@ -73,26 +82,11 @@ final readonly class ProjectRepository
     public function saveCounter(int $id, int $number): void
     {
         $statement = $this->connection->prepare('UPDATE projects SET next_build_number = :number, is_exhausted = FALSE WHERE id = :id');
-        $statement->execute(['number' => $number, 'id' => $id]);
+        $statement->execute(['id' => $id, 'number' => $number]);
     }
 
     /**
-     * Changes only contributor visibility; recording continues regardless.
-     *
-     * @param int $id
-     * @param bool $isVisible
-     * @return void
-     */
-    public function saveHistoryVisibility(int $id, bool $isVisible): void
-    {
-        $statement = $this->connection->prepare('UPDATE projects SET is_other_history_visible = :visible WHERE id = :id');
-        $statement->bindValue('visible', $isVisible, PDO::PARAM_BOOL);
-        $statement->bindValue('id', $id, PDO::PARAM_INT);
-        $statement->execute();
-    }
-
-    /**
-     * Archives/reactivates a stable project instead of deleting referenced records.
+     * Archives or restores a project without deleting its tokens/history.
      *
      * @param int $id
      * @param bool $isArchived

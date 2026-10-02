@@ -1,9 +1,9 @@
 <?php
 
-/** Delegates the protected saveArchiveState action to its controller. */
+/** Delegates the saveArchiveState action to local management. */
 
 declare(strict_types=1);
 
-use Ordinal\Controller\AccountController;
+use Ordinal\Controller\ManagementController;
 
-return (new AccountController($this->accountApplication))->handle('saveArchiveState', $query, $fields, $cookies, $isSecure);
+return (new ManagementController($this->managementApplication))->handle('saveArchiveState', $query, $fields, $cookies, $isSecure, $_SERVER['REMOTE_ADDR'] ?? 'local');

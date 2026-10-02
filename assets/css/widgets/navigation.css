@@ -1,3 +1,5 @@
 .navigation { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
 .navigation a { padding: .45rem .8rem; border-radius: .3rem; text-decoration: none; min-height: 44px; }
 .navigation a:hover, .navigation a[aria-current="page"] { background: #dce9e2; color: #104c42; }
+.navigation form { margin: 0; padding: 0; border: 0; background: transparent; }
+.navigation button { margin: 0; }

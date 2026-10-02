@@ -11,7 +11,7 @@ use Ordinal\View\TemplateRenderer;
 final class HomeController
 {
     /**
-     * Displays the product name using the unstyled home template.
+     * Introduces independent projects and named build tokens.
      *
      * @return Response
      */

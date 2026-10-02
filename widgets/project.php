@@ -1,48 +1,63 @@
 <?php
 
-/** Shows a linked project only after current contributor or administrator access is verified. */
-
+/** Shows a project, optional repository link and multiple named tokens. */
 declare(strict_types=1);
 
 use Ordinal\View\TemplateRenderer;
+
+$project = $data['project'];
+$projectId = (int) $project['id'];
+$csrfToken = TemplateRenderer::escape($data['session']->csrfToken);
 ?>
-<h2><?= TemplateRenderer::escape($data['project']['name']) ?></h2>
-<p>Provider connection: <?= (int) $data['project']['provider_connection_id'] ?>. Repository ID: <?= TemplateRenderer::escape($data['project']['provider_repository_id']) ?>.</p>
-<p>Current access: <?= $data['permissions']->canAdministerProject ? 'project administration' : 'contributor' ?>.</p>
-<p>Project state: <?= $data['project']['archived_at'] === null ? 'active' : 'archived' ?>.</p>
-<p><a href="/projects/<?= (int) $data['project']['id'] ?>/history">Build history</a></p>
-<?php if ($data['permissions']->canAdministerProject): ?>
-<p><a href="/projects/<?= (int) $data['project']['id'] ?>/logs">Project audit logs</a><?php if ($data['project']['archived_at'] === null && $data['project']['connection_disabled_at'] === null): ?> · <a href="/projects/<?= (int) $data['project']['id'] ?>/counter">Counter controls</a><?php endif; ?></p>
-<?php if ($data['project']['archived_at'] === null && $data['project']['connection_disabled_at'] === null): ?>
-<form method="post" action="/projects/<?= (int) $data['project']['id'] ?>/history-policy">
-    <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($data['session']->csrfToken) ?>">
-    <p><label>Contributor history <select name="isVisible"><option value="0"<?= !$data['project']['is_other_history_visible'] ? ' selected' : '' ?>>Own builds only</option><option value="1"<?= $data['project']['is_other_history_visible'] ? ' selected' : '' ?>>All callers in this project</option></select></label></p>
-    <button type="submit">Save history visibility</button>
+<h2><?= TemplateRenderer::escape($project['name']) ?></h2>
+<?php if ($project['repository_url'] !== null): ?><p><a href="<?= TemplateRenderer::escape($project['repository_url']) ?>" rel="noopener noreferrer">Repository</a></p><?php endif; ?>
+<p>Next build number: <?= (int) $project['next_build_number'] ?><?= $project['is_exhausted'] ? ' (exhausted)' : '' ?>.</p>
+<p><a href="/projects/<?= $projectId ?>/counter">Counter</a> · <a href="/projects/<?= $projectId ?>/history">Build history</a></p>
+<?php if ($project['archived_at'] === null): ?>
+<h3>Project tokens</h3>
+<p>Generate a token for each build system or person. Every token belongs only to this project.</p>
+<?php if ($data['tokens'] === []): ?><p>No tokens yet.</p><?php endif; ?>
+<?php foreach ($data['tokens'] as $token): ?>
+<section class="project-token">
+    <h4><?= TemplateRenderer::escape($token['name']) ?></h4>
+    <p><?= $token['revoked_at'] === null ? 'Active' : 'Revoked' ?> · <?= $token['expires_at'] === null ? 'No expiration' : 'Expires: ' . TemplateRenderer::escape($token['expires_at']) ?></p>
+    <?php if ($token['revoked_at'] === null): ?>
+    <details><summary>Manage token</summary>
+    <form method="post" action="/projects/<?= $projectId ?>/tokens">
+        <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>"><input type="hidden" name="tokenId" value="<?= (int) $token['id'] ?>"><input type="hidden" name="action" value="rename">
+        <label>Token name <input name="name" value="<?= TemplateRenderer::escape($token['name']) ?>" required></label>
+        <button type="submit">Rename token</button>
+    </form>
+    <form method="post" action="/projects/<?= $projectId ?>/tokens">
+        <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>"><input type="hidden" name="tokenId" value="<?= (int) $token['id'] ?>"><input type="hidden" name="action" value="rotate">
+        <label>New expiration in days (optional) <input name="lifetimeDays" inputmode="numeric" placeholder="No expiration"></label>
+        <p>Replacing the secret immediately invalidates the previous one. Retry history stays.</p>
+        <button type="submit">Replace secret</button>
+    </form>
+    <form method="post" action="/projects/<?= $projectId ?>/tokens">
+        <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>"><input type="hidden" name="tokenId" value="<?= (int) $token['id'] ?>"><input type="hidden" name="action" value="revoke">
+        <button type="submit">Revoke token</button>
+    </form>
+    </details>
+    <?php endif; ?>
+</section>
+<?php endforeach; ?>
+<h3>Generate token</h3>
+<form method="post" action="/projects/<?= $projectId ?>/tokens">
+    <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>"><input type="hidden" name="action" value="create">
+    <p><label>Token name <input name="name" placeholder="Laptop or CI" required></label></p>
+    <p><label>Expires after days (optional) <input name="lifetimeDays" inputmode="numeric" placeholder="No expiration"></label></p>
+    <button type="submit">Generate token</button>
 </form>
-<?php endif; ?>
-<form method="post" action="/projects/<?= (int) $data['project']['id'] ?>/archive">
-    <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($data['session']->csrfToken) ?>">
-    <input type="hidden" name="isArchived" value="<?= $data['project']['archived_at'] === null ? '1' : '0' ?>">
-    <p>Archiving blocks allocation and replay. It preserves counters, history and original request IDs.</p>
-    <button type="submit"><?= $data['project']['archived_at'] === null ? 'Archive project' : 'Reactivate project' ?></button>
+<h3>Project settings</h3>
+<form method="post" action="/projects/<?= $projectId ?>">
+    <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>">
+    <p><label>Project name <input name="name" value="<?= TemplateRenderer::escape($project['name']) ?>" required></label></p>
+    <p><label>Repository URL (optional) <input type="url" name="repositoryUrl" value="<?= TemplateRenderer::escape($project['repository_url'] ?? '') ?>"></label></p>
+    <button type="submit">Save project</button>
 </form>
-<?php endif; ?>
-<?php if ($data['permissions']->canAdministerProject): ?><p><a href="/automation?projectId=<?= (int) $data['project']['id'] ?>">Manage automation tokens</a></p><?php endif; ?>
-<h3>Build authentication</h3>
-<p>Authentication: <?= $data['project']['is_authentication_required'] ? 'required' : 'disabled (anonymous allocation)' ?>. Effective device lifetime: <?= (int) $data['project']['device_lifetime_days'] ?> days.</p>
-<p>Positive days expire from provider sign-in. 0 allows one allocation and its replay. -1 has no time expiration. Policy changes apply to new credentials; existing credentials keep their assigned expiration.</p>
-<p><a href="/devices?projectId=<?= (int) $data['project']['id'] ?>">Manage device credentials for this project</a></p>
-<?php if ($data['isAdministrator']): ?>
-<form method="post" action="/devices/policy">
-    <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($data['session']->csrfToken) ?>">
-    <input type="hidden" name="projectId" value="<?= (int) $data['project']['id'] ?>">
-    <p><label>Authentication override <select name="isRequired">
-        <option value="inherit"<?= $data['project']['authentication_required_override'] === null ? ' selected' : '' ?>>Inherit instance default</option>
-        <option value="1"<?= $data['project']['authentication_required_override'] === true ? ' selected' : '' ?>>Required</option>
-        <option value="0"<?= $data['project']['authentication_required_override'] === false ? ' selected' : '' ?>>Disabled</option>
-    </select></label></p>
-    <p><label>Device lifetime override <input name="lifetimeDays" value="<?= $data['project']['device_lifetime_days_override'] === null ? 'inherit' : (int) $data['project']['device_lifetime_days_override'] ?>" required></label> (inherit, -1, 0, or positive days)</p>
-    <button type="submit">Save project authentication settings</button>
+<?php else: ?><p>This project is archived. Tokens cannot allocate numbers until it is restored.</p><?php endif; ?>
+<form method="post" action="/projects/<?= $projectId ?>/archive">
+    <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>"><input type="hidden" name="isArchived" value="<?= $project['archived_at'] === null ? '1' : '0' ?>">
+    <button type="submit"><?= $project['archived_at'] === null ? 'Archive project' : 'Restore project' ?></button>
 </form>
-<?php endif; ?>
-<p><a href="/projects">Projects</a> · <a href="/account">Account</a></p>

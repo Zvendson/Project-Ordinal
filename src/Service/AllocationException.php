@@ -15,8 +15,8 @@ final class AllocationException extends RuntimeException
     public const string INVALID_AUTHENTICATION = 'INVALID_AUTHENTICATION';
     /** Identifies insufficient permission or a credential scoped to another project. */
     public const string ACCESS_DENIED = 'ACCESS_DENIED';
-    /** Identifies temporary unavailability of required provider verification. */
-    public const string PROVIDER_UNAVAILABLE = 'PROVIDER_UNAVAILABLE';
+    /** Identifies temporary unavailability of the build service. */
+    public const string SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
     /** Identifies a counter with no remaining uint32 numbers. */
     public const string BUILD_COUNTER_EXHAUSTED = 'BUILD_COUNTER_EXHAUSTED';
 

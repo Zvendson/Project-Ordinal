@@ -47,18 +47,13 @@ final class TemplateRendererTest extends TestCase
         self::assertStringContainsString('role="alert"', (new TemplateRenderer())->renderError('Sign in again.'));
     }
 
-    /** Keeps browser navigation permission-aware and renders secrets only in the response. @return void */
-    public function testRendersAuthenticatedNavigationAndSharedSecret(): void
+    /** Escapes one-time token values and rejects unknown template names. */
+    public function testEscapesIssuedSecrets(): void
     {
-        $session = new \Ordinal\Model\BrowserSession(1, 1, 1, '8', '<Alice>', 'csrf', null, new \DateTimeImmutable('+1 hour'));
-        $html = (new TemplateRenderer())->renderAccountPage('account', ['session' => $session, 'isAdministrator' => true]);
-        self::assertStringContainsString('href="/administration"', $html);
-        self::assertStringContainsString('href="/devices"', $html);
-        self::assertStringContainsString('&lt;Alice&gt;', $html);
-        $secret = (new TemplateRenderer())->renderAccountPage('automation-secret', ['id' => 1, 'name' => 'CI', 'projectId' => 1, 'token' => '<secret>', 'expiresAt' => null]);
-        self::assertStringContainsString('readonly', $secret);
-        self::assertStringContainsString('data-copy-secret', $secret);
-        self::assertStringContainsString('&lt;secret&gt;', $secret);
-        self::assertStringContainsString('role="status"', $secret);
+        $session = new \Ordinal\Model\AdministratorSession(1, 'csrf', true);
+        $html = (new TemplateRenderer())->renderAccountPage('token-secret', ['session' => $session, 'name' => '<Laptop>', 'projectId' => 1, 'token' => '<script>secret</script>']);
+        self::assertStringContainsString('&lt;script&gt;secret&lt;/script&gt;', $html);
+        self::assertStringNotContainsString('<script>secret', $html);
+        self::assertStringContainsString('data-copy-secret', $html);
     }
 }

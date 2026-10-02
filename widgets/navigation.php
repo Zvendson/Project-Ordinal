@@ -1,13 +1,18 @@
 <?php
 
-/** Shows shared navigation with administrator links only for verified page data. */
+/** Provides small navigation for local project management. */
 declare(strict_types=1);
+
+use Ordinal\View\TemplateRenderer;
 ?>
 <nav class="navigation" aria-label="Main navigation">
     <a href="/">Home</a>
     <a href="/projects">Projects</a>
-    <a href="/devices">Devices</a>
-    <a href="/account">Account</a>
-    <?php if ($data['isAdministrator'] ?? false): ?><a href="/administration">Administration</a><a href="/logs">Audit logs</a><?php endif; ?>
-    <?php if (!isset($data['session'])): ?><a href="/login">Sign in</a><?php endif; ?>
+    <?php if (($data['session']->isAuthenticated ?? false)): ?>
+        <a href="/logs">Audit logs</a>
+        <form method="post" action="/logout">
+            <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($data['session']->csrfToken) ?>">
+            <button type="submit">Sign out</button>
+        </form>
+    <?php else: ?><a href="/login">Sign in</a><?php endif; ?>
 </nav>

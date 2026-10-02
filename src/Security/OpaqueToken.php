@@ -33,7 +33,7 @@ final class OpaqueToken
      */
     public static function createToken(string $kind, int $id, #[SensitiveParameter] string $secret): string
     {
-        if (!in_array($kind, ['device', 'automation'], true) || $id < 1 || preg_match('/^[a-f0-9]{64}$/D', $secret) !== 1) {
+        if (!in_array($kind, ['project', 'automation'], true) || $id < 1 || preg_match('/^[a-f0-9]{64}$/D', $secret) !== 1) {
             throw new InvalidArgumentException('Invalid credential format.');
         }
         return $kind . '.' . $id . '.' . $secret;
@@ -48,7 +48,7 @@ final class OpaqueToken
      */
     public static function parseToken(string $kind, #[SensitiveParameter] ?string $token): array
     {
-        if (!in_array($kind, ['device', 'automation'], true)
+        if (!in_array($kind, ['project', 'automation'], true)
             || preg_match('/^' . preg_quote($kind, '/') . '\.([1-9][0-9]*)\.([a-f0-9]{64})$/D', $token ?? '', $matches) !== 1
             || filter_var($matches[1], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false) {
             throw new AuthenticationException('Authentication is required or invalid.');

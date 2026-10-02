@@ -1,9 +1,9 @@
 <?php
 
-/** Delegates the protected showInstanceLogs action to its controller. */
+/** Delegates the showLogs action to local management. */
 
 declare(strict_types=1);
 
-use Ordinal\Controller\AccountController;
+use Ordinal\Controller\ManagementController;
 
-return (new AccountController($this->accountApplication))->handle('showInstanceLogs', $query, $fields, $cookies, $isSecure);
+return (new ManagementController($this->managementApplication))->handle('showLogs', $query, $fields, $cookies, $isSecure, $_SERVER['REMOTE_ADDR'] ?? 'local');

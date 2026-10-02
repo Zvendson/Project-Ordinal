@@ -7,12 +7,11 @@ namespace Ordinal\Service;
 use Ordinal\Database\Transaction;
 use Ordinal\Model\AllocationCaller;
 use Ordinal\Repository\AllocationRepository;
-use Ordinal\Repository\DeviceRepository;
-use Ordinal\Repository\AutomationRepository;
+use Ordinal\Repository\TokenRepository;
 use Ordinal\Security\AuthenticationException;
 use PDO;
 
-/** Allocates or replays numbers atomically and rechecks locked credential validity and device consumption. */
+/** Allocates or replays numbers atomically and rechecks locked credential validity after lock waits. */
 final class BuildNumberService
 {
     /** Defines the inclusive uint32 maximum. */
@@ -51,18 +50,12 @@ final class BuildNumberService
              * @return void
              */
             function (PDO $connection) use ($projectId, $requestId, $caller, $repository, &$buildNumber): void {
-                $devices = new DeviceRepository($connection);
                 if ($caller->automationTokenId !== null) {
                     if ($caller->automationSecretHash === null) {
                         throw new AuthenticationException('Verified automation authentication is required.');
                     }
-                    $automation = new AutomationRepository($connection);
+                    $automation = new TokenRepository($connection);
                     $automation->requireActiveToken($automation->findToken($caller->automationTokenId, true), $projectId, $caller->automationSecretHash);
-                }
-                $credential = null;
-                if ($caller->deviceCredentialId !== null) {
-                    $credential = $devices->findCredential($caller->deviceCredentialId, true);
-                    $devices->requireActiveCredential($credential, $projectId, $caller->userId);
                 }
                 $project = $repository->lockProject($projectId);
                 if ($project === null || $project['archived_at'] !== null || $project['disabled_at'] !== null) {
@@ -72,18 +65,10 @@ final class BuildNumberService
                 if ($caller->automationTokenId !== null) {
                     $automation->requireActiveToken($automation->findToken($caller->automationTokenId), $projectId, $caller->automationSecretHash);
                 }
-                if ($caller->deviceCredentialId !== null) {
-                    $credential = $devices->findCredential($caller->deviceCredentialId);
-                    $devices->requireActiveCredential($credential, $projectId, $caller->userId);
-                }
                 if ($caller->getKind() === AllocationCaller::ANONYMOUS && $project['is_authentication_required']) {
                     throw new AllocationException(AllocationException::INVALID_AUTHENTICATION);
                 }
                 $allocation = $repository->findAllocation($projectId, $requestId, $caller);
-                if ($credential !== null && $credential['consumed_allocation_id'] !== null
-                    && ($allocation === null || (int) $allocation['id'] !== (int) $credential['consumed_allocation_id'])) {
-                    throw new AuthenticationException('This credential permits only its original allocation replay.');
-                }
                 if ($allocation !== null) {
                     $buildNumber = $allocation['build_number'];
                     $repository->createAuditEvent($projectId, $allocation['id'], $caller, true);
@@ -94,9 +79,6 @@ final class BuildNumberService
                 }
                 $buildNumber  = $project['next_build_number'];
                 $allocationId = $repository->createAllocation($projectId, $requestId, $buildNumber, $caller);
-                if ($credential !== null && $credential['lifetime_days'] === 0) {
-                    $devices->consumeCredential($caller->deviceCredentialId, $allocationId);
-                }
                 $isExhausted  = $buildNumber === self::MAX_BUILD_NUMBER;
                 $repository->updateCounter($projectId, $isExhausted ? $buildNumber : $buildNumber + 1, $isExhausted);
                 $repository->createAuditEvent($projectId, $allocationId, $caller, false);

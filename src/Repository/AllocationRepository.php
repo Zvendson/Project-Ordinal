@@ -29,10 +29,9 @@ final class AllocationRepository
     public function lockProject(int $projectId): ?array
     {
         $statement = $this->connection->prepare(<<<'SQL'
-            SELECT project.*, connection.disabled_at,
+            SELECT project.*, NULL::timestamptz AS disabled_at,
                 COALESCE(project.authentication_required_override, settings.is_authentication_required) AS is_authentication_required
             FROM projects AS project
-            JOIN provider_connections AS connection ON connection.id = project.provider_connection_id
             CROSS JOIN instance_settings AS settings
             WHERE project.id = :projectId AND settings.id = 1
             FOR UPDATE OF project

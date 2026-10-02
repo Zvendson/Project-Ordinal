@@ -1,1 +1,3 @@
 [data-widget="project"] > p:first-of-type { color: var(--muted); }
+
+.project-token { border: 1px solid var(--line); border-radius: 0.5rem; padding: 1rem; margin-block: 1rem; }

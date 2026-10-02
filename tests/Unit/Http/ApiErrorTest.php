@@ -20,7 +20,7 @@ final class ApiErrorTest extends TestCase
     {
         foreach (['INVALID_REQUEST' => 400, 'INVALID_AUTHENTICATION' => 401,
             'ACCESS_DENIED' => 403, 'PROJECT_NOT_FOUND' => 404,
-            'BUILD_COUNTER_EXHAUSTED' => 409, 'PROVIDER_UNAVAILABLE' => 503,
+            'BUILD_COUNTER_EXHAUSTED' => 409, 'SERVICE_UNAVAILABLE' => 503,
             'NOT_FOUND' => 404, 'METHOD_NOT_ALLOWED' => 405, 'INTERNAL_ERROR' => 500] as $code => $status) {
             $response = ApiError::createResponse($code);
             $data = json_decode($response->body, true, flags: JSON_THROW_ON_ERROR);

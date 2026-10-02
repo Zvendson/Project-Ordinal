@@ -7,7 +7,7 @@ declare(strict_types=1);
 use Ordinal\Controller\BuildNumberController;
 use Ordinal\Security\RuntimeAllocationAuthorizer;
 
-return (new BuildNumberController(new RuntimeAllocationAuthorizer($this->accountApplication, $isSecure)))->createBuildNumber(
+return (new BuildNumberController(new RuntimeAllocationAuthorizer($this->managementApplication, $isSecure)))->createBuildNumber(
     $routeParameters['projectId'],
     $body,
     $authorizationHeader,

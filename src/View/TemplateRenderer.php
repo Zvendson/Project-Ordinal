@@ -23,7 +23,7 @@ final class TemplateRenderer
         array  $data,
     ): string
     {
-        $templates = ['login' => 'login.php', 'account' => 'account.php', 'administration' => 'administration.php', 'projects' => 'projects.php', 'project' => 'project.php', 'devices' => 'devices.php', 'device-credential' => 'device-credential.php', 'automation' => 'automation.php', 'automation-secret' => 'automation-secret.php', 'counter' => 'counter.php', 'events' => 'events.php', 'log-cleanup' => 'log-cleanup.php'];
+        $templates = ['login' => 'login.php', 'projects' => 'projects.php', 'project' => 'project.php', 'token-secret' => 'token-secret.php', 'counter' => 'counter.php', 'events' => 'events.php'];
         if (!isset($templates[$page])) {
             throw new \InvalidArgumentException('Unknown account template.');
         }

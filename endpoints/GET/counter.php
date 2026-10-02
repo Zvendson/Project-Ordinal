@@ -1,9 +1,9 @@
 <?php
 
-/** Delegates the protected showCounter action to its controller. */
+/** Delegates the showCounter action to local management. */
 
 declare(strict_types=1);
 
-use Ordinal\Controller\AccountController;
+use Ordinal\Controller\ManagementController;
 
-return (new AccountController($this->accountApplication))->handle('showCounter', $query, $fields, $cookies, $isSecure);
+return (new ManagementController($this->managementApplication))->handle('showCounter', $query, $fields, $cookies, $isSecure, $_SERVER['REMOTE_ADDR'] ?? 'local');

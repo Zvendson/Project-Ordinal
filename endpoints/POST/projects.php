@@ -1,7 +1,9 @@
 <?php
 
-/** Delegates the createProject browser endpoint to its account controller. */
+/** Delegates the createProject action to local management. */
 
 declare(strict_types=1);
 
-return (new \Ordinal\Controller\AccountController($this->accountApplication))->handle('createProject', $query, $fields, $cookies, $isSecure);
+use Ordinal\Controller\ManagementController;
+
+return (new ManagementController($this->managementApplication))->handle('createProject', $query, $fields, $cookies, $isSecure, $_SERVER['REMOTE_ADDR'] ?? 'local');

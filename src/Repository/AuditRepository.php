@@ -26,13 +26,13 @@ final readonly class AuditRepository
     /**
      * Records trusted administrative fields in the mutation's transaction.
      *
-     * @param int $actorId
+     * @param ?int $actorId
      * @param ?int $projectId
      * @param string $action
      * @param array $details
      * @return void
      */
-    public function recordEvent(int $actorId, ?int $projectId, string $action, array $details = []): void
+    public function recordEvent(?int $actorId, ?int $projectId, string $action, array $details = []): void
     {
         $statement = $this->connection->prepare("INSERT INTO audit_events (user_id, project_id, action, outcome, details) VALUES (:user, :project, :action, 'success', CAST(:details AS JSONB))");
         $statement->execute(['user' => $actorId, 'project' => $projectId, 'action' => $action, 'details' => json_encode((object) $details, JSON_THROW_ON_ERROR)]);
@@ -65,7 +65,7 @@ final readonly class AuditRepository
     }
 
     /**
-     * Reads bounded pages with provider-qualified users or named CI attribution, never secrets.
+     * Reads bounded pages with named token attribution, never secrets.
      *
      * @param ?int $projectId
      * @param ?int $userId
@@ -89,10 +89,9 @@ final readonly class AuditRepository
         $statement = $this->connection->prepare("SELECT e.id, e.project_id, e.allocation_id, e.user_id, e.automation_token_id, e.action, e.outcome, e.details,
             to_char(e.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS created_at_utc,
             a.build_number, a.request_id, COALESCE(a.caller_kind, e.details ->> 'callerKind') AS caller_kind,
-            u.display_name, u.provider_user_id, u.provider_connection_id, c.name AS provider_name,
-            c.server_url AS provider_server_url, t.name AS automation_name, p.name AS project_name
-            FROM audit_events e LEFT JOIN allocations a ON a.id = e.allocation_id LEFT JOIN users u ON u.id = e.user_id
-            LEFT JOIN provider_connections c ON c.id = u.provider_connection_id LEFT JOIN automation_tokens t ON t.id = e.automation_token_id
+            t.name AS automation_name, p.name AS project_name
+            FROM audit_events e LEFT JOIN allocations a ON a.id = e.allocation_id
+            LEFT JOIN automation_tokens t ON t.id = e.automation_token_id
             LEFT JOIN projects p ON p.id = e.project_id" . ($filters === [] ? '' : ' WHERE ' . implode(' AND ', $filters)) . ' ORDER BY e.id DESC LIMIT ' . self::PAGE_SIZE);
         $statement->execute($parameters);
         return $statement->fetchAll(PDO::FETCH_ASSOC);
