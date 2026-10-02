@@ -11,8 +11,12 @@ final class AllocationException extends RuntimeException
 {
     /** Identifies an unavailable project. */
     public const string PROJECT_NOT_FOUND = 'PROJECT_NOT_FOUND';
-    /** Identifies anonymous access that current project policy no longer permits. */
+    /** Identifies authentication that current project policy requires or no longer accepts. */
     public const string INVALID_AUTHENTICATION = 'INVALID_AUTHENTICATION';
+    /** Identifies insufficient permission or a credential scoped to another project. */
+    public const string ACCESS_DENIED = 'ACCESS_DENIED';
+    /** Identifies temporary unavailability of required provider verification. */
+    public const string PROVIDER_UNAVAILABLE = 'PROVIDER_UNAVAILABLE';
     /** Identifies a counter with no remaining uint32 numbers. */
     public const string BUILD_COUNTER_EXHAUSTED = 'BUILD_COUNTER_EXHAUSTED';
 
