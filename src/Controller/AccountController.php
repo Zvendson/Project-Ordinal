@@ -54,7 +54,7 @@ final class AccountController
         bool   $isSecure,
     ): Response {
         if (!$isSecure) {
-            return $this->createError('Account pages require HTTPS.', 400);
+            return $this->createActionError($action, 'Account pages require HTTPS.', $action === 'previewNext' ? 401 : 400);
         }
         try {
             $this->application ??= AccountApplication::createFromEnvironment();
@@ -77,16 +77,24 @@ final class AccountController
                 'showAutomation' => $this->showAutomation($query, $cookies),
                 'saveAutomation' => $this->saveAutomation($fields, $cookies),
                 'saveAutomationPolicy' => $this->saveAutomationPolicy($fields, $cookies),
+                'previewNext' => $this->previewNext($query, $cookies),
+                'showCounter' => $this->showCounter($query, $cookies),
+                'saveCounter' => $this->saveCounter($query, $fields, $cookies),
+                'saveHistoryVisibility' => $this->saveHistoryVisibility($query, $fields, $cookies),
+                'saveArchiveState' => $this->saveArchiveState($query, $fields, $cookies),
+                'showHistory', 'showProjectLogs', 'showInstanceLogs' => $this->showEvents($action, $query, $cookies),
+                'showLogCleanup' => $this->showLogCleanup($query, $cookies),
+                'cleanupLogs' => $this->cleanupLogs($fields, $cookies),
                 default => $this->createError('Page not found.', 404),
             };
         } catch (AuthenticationException | ProviderAuthenticationException) {
-            return $this->createError('Sign in again to continue.', 401);
+            return $this->createActionError($action, 'Sign in again to continue.', 401);
         } catch (ProviderUnavailableException) {
-            return $this->createError('Provider verification is temporarily unavailable. Try again later.', 503);
+            return $this->createActionError($action, 'Provider verification is temporarily unavailable. Try again later.', 503);
         } catch (AccountException $exception) {
-            return $this->createError($exception->getMessage(), $exception->statusCode);
+            return $this->createActionError($action, $exception->getMessage(), $exception->statusCode);
         } catch (InvalidArgumentException) {
-            return $this->createError('Account configuration is unavailable. Contact the server operator.', 503);
+            return $this->createActionError($action, 'Account configuration is unavailable. Contact the server operator.', 503);
         }
     }
 
@@ -118,7 +126,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function completeLogin(#[SensitiveParameter] array $query, #[SensitiveParameter] array $cookies): Response
+    private function completeLogin(
+        #[SensitiveParameter]
+        array $query,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         if (isset($query['error'])) {
             $this->application->login->cancelLogin(is_string($query['state'] ?? null) ? $query['state'] : '', $this->getCookie($cookies, LoginService::COOKIE_NAME));
@@ -134,7 +147,10 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function showAccount(#[SensitiveParameter] array $cookies): Response
+    private function showAccount(
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getSession($cookies);
         return $this->renderPage('account', ['session' => $session, 'isAdministrator' => $this->application->administration->isInstanceAdministrator($session->userId)]);
@@ -147,7 +163,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function reauthenticate(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function reauthenticate(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         return $this->createLoginRedirect($this->application->login->beginLogin($session->providerConnectionId, $session));
@@ -160,7 +181,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function logout(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function logout(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $this->application->sessions->revokeSession($this->getFormSession($fields, $cookies));
         return $this->redirect('/login', ['Set-Cookie' => BrowserSessionService::createExpiredCookie()]);
@@ -172,7 +198,10 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function showAdministration(#[SensitiveParameter] array $cookies): Response
+    private function showAdministration(
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getSession($cookies);
         return $this->renderPage('administration', $this->application->administration->getAdministrationData($session) + ['session' => $session]);
@@ -185,7 +214,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function saveAdministration(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function saveAdministration(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         $this->application->administration->requireInstanceAdministrator($session);
@@ -211,7 +245,10 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function showProjects(#[SensitiveParameter] array $cookies): Response
+    private function showProjects(
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getSession($cookies);
         return $this->renderPage('projects', ['session' => $session, 'projects' => $this->application->projects->findVisibleProjects($session), 'isAdministrator' => $this->application->administration->isInstanceAdministrator($session->userId)]);
@@ -224,10 +261,199 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function showProject(array $query, #[SensitiveParameter] array $cookies): Response
+    private function showProject(
+        array $query,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getSession($cookies);
         return $this->renderPage('project', $this->application->projects->getProject($session, $this->getPositiveInteger($query, 'projectId')) + ['session' => $session, 'isAdministrator' => $this->application->administration->isInstanceAdministrator($session->userId)]);
+    }
+
+    /**
+     * Returns the administrator-only read-only JSON preview.
+     *
+     * @param array $query
+     * @param array $cookies
+     * @return Response
+     */
+    private function previewNext(
+        array $query,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
+    {
+        return Response::createJson($this->application->projectAdministration->getNextBuildNumber($this->getSession($cookies), $this->getPositiveInteger($query, 'projectId')));
+    }
+
+    /**
+     * Shows protected counter forms and a preview-only check button.
+     *
+     * @param array $query
+     * @param array $cookies
+     * @return Response
+     */
+    private function showCounter(
+        array $query,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
+    {
+        $session = $this->getSession($cookies);
+        $id = $this->getPositiveInteger($query, 'projectId');
+        return $this->renderPage('counter', $this->application->projects->getProject($session, $id) + ['session' => $session, 'preview' => $this->application->projectAdministration->getNextBuildNumber($session, $id)]);
+    }
+
+    /**
+     * Validates CSRF, canonical numbers and explicit reset confirmation before mutation.
+     *
+     * @param array $query
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function saveCounter(
+        array $query,
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $id = $this->getPositiveInteger($query, 'projectId');
+        $number = \Ordinal\Model\BuildNumber::parse($this->getString($fields, 'nextBuildNumber'));
+        match ($this->getString($fields, 'action')) {
+            'edit' => $this->application->projectAdministration->editCounter($session, $id, $number),
+            'reset' => $this->application->projectAdministration->resetCounter($session, $id, $number, $this->getString($fields, 'projectName'), $this->getBoolean($fields, 'hasConfirmedReuse')),
+            default => throw new AccountException('The request is invalid.', 400),
+        };
+        return $this->redirect('/projects/' . $id . '/counter');
+    }
+
+    /**
+     * Saves project contributor-history policy through a protected browser form.
+     *
+     * @param array $query
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function saveHistoryVisibility(
+        array $query,
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $id = $this->getPositiveInteger($query, 'projectId');
+        $this->application->projectAdministration->saveHistoryVisibility($session, $id, $this->getBoolean($fields, 'isVisible'));
+        return $this->redirect('/projects/' . $id);
+    }
+
+    /**
+     * Archives/reactivates a stable project without deleting any linked records.
+     *
+     * @param array $query
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function saveArchiveState(
+        array $query,
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $id = $this->getPositiveInteger($query, 'projectId');
+        $this->application->projectAdministration->setArchived($session, $id, $this->getBoolean($fields, 'isArchived'));
+        return $this->redirect('/projects/' . $id);
+    }
+
+    /**
+     * Reads bounded pages under the distinct history/project/instance access rules.
+     *
+     * @param string $action
+     * @param array $query
+     * @param array $cookies
+     * @return Response
+     */
+    private function showEvents(
+        string $action,
+        array  $query,
+        #[SensitiveParameter]
+        array  $cookies,
+    ): Response
+    {
+        $session = $this->getSession($cookies);
+        $beforeId = isset($query['beforeId']) ? $this->getPositiveInteger($query, 'beforeId') : null;
+        $id = $action === 'showInstanceLogs' ? null : $this->getPositiveInteger($query, 'projectId');
+        $data = match ($action) {
+            'showHistory' => $this->application->history->getProjectHistory($session, $id, $beforeId),
+            'showProjectLogs' => $this->application->history->getProjectLogs($session, $id, $beforeId),
+            default => $this->application->history->getInstanceLogs($session, $beforeId),
+        };
+        $isHistory = $action === 'showHistory';
+        return $this->renderPage('events', $data + ['isHistory' => $isHistory, 'pagePath' => $id === null ? '/logs' : '/projects/' . $id . ($isHistory ? '/history' : '/logs')]);
+    }
+
+    /**
+     * Previews the UTC deletion boundary/count before confirmation.
+     *
+     * @param array $query
+     * @param array $cookies
+     * @return Response
+     */
+    private function showLogCleanup(
+        array $query,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
+    {
+        $session = $this->getSession($cookies);
+        $date = isset($query['beforeDate']) ? $this->getString($query, 'beforeDate') : gmdate('Y-m-d');
+        return $this->renderPage('log-cleanup', $this->application->history->getCleanupPreview($session, $date) + ['session' => $session]);
+    }
+
+    /**
+     * Deletes only confirmed old audit entries under active instance administration and CSRF protection.
+     *
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function cleanupLogs(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $this->application->history->cleanupLogs($session, $this->getString($fields, 'beforeDate'), $this->getBoolean($fields, 'isConfirmed'));
+        return $this->redirect('/logs');
+    }
+
+    /**
+     * Keeps JSON preview errors consistent with the API while other forms retain HTML errors.
+     *
+     * @param string $action
+     * @param string $message
+     * @param int $status
+     * @return Response
+     */
+    private function createActionError(string $action, string $message, int $status): Response
+    {
+        if ($action !== 'previewNext') { return $this->createError($message, $status); }
+        return \Ordinal\Http\ApiError::createResponse(match ($status) {
+            400 => 'INVALID_REQUEST', 401 => 'INVALID_AUTHENTICATION', 403 => 'ACCESS_DENIED', 404 => 'PROJECT_NOT_FOUND', 503 => 'PROVIDER_UNAVAILABLE', default => 'INTERNAL_ERROR',
+        });
     }
 
     /**
@@ -237,7 +463,11 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function showDevices(array $query, #[SensitiveParameter] array $cookies): Response
+    private function showDevices(
+        array $query,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getSession($cookies);
         $projectId = isset($query['projectId']) ? $this->getPositiveInteger($query, 'projectId') : null;
@@ -251,7 +481,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function enrollDevice(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function enrollDevice(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         $deviceId = ($fields['deviceId'] ?? '') === '' ? null : $this->getPositiveInteger($fields, 'deviceId');
@@ -266,7 +501,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function revokeDevice(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function revokeDevice(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         switch ($this->getString($fields, 'action')) {
@@ -289,7 +529,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function saveAuthenticationPolicy(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function saveAuthenticationPolicy(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         $projectId = ($fields['projectId'] ?? '') === '' ? null : $this->getPositiveInteger($fields, 'projectId');
@@ -312,7 +557,11 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function showAutomation(array $query, #[SensitiveParameter] array $cookies): Response
+    private function showAutomation(
+        array $query,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getSession($cookies);
         $projectId = $this->getPositiveInteger($query, 'projectId');
@@ -326,7 +575,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function saveAutomation(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function saveAutomation(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         $projectId = $this->getPositiveInteger($fields, 'projectId');
@@ -354,7 +608,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function saveAutomationPolicy(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function saveAutomationPolicy(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         $this->application->automation->savePolicy($session, $this->getPositiveInteger($fields, 'lifetimeDays'), $this->getBoolean($fields, 'isWithoutExpirationAllowed'));
@@ -368,7 +627,12 @@ final class AccountController
      * @param array $cookies
      * @return Response
      */
-    private function createProject(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    private function createProject(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): Response
     {
         $session = $this->getFormSession($fields, $cookies);
         $id = $this->application->projects->createProject($session, $this->getPositiveInteger($fields, 'connectionId'), $this->getString($fields, 'repositoryId'), $this->getString($fields, 'name'));
@@ -382,7 +646,12 @@ final class AccountController
      * @param array $cookies
      * @return BrowserSession
      */
-    private function getFormSession(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): BrowserSession
+    private function getFormSession(
+        #[SensitiveParameter]
+        array $fields,
+        #[SensitiveParameter]
+        array $cookies,
+    ): BrowserSession
     {
         $session = $this->getSession($cookies);
         $this->application->sessions->requireCsrfToken($session, $fields['csrfToken'] ?? null);
@@ -395,7 +664,10 @@ final class AccountController
      * @param array $cookies
      * @return BrowserSession
      */
-    private function getSession(#[SensitiveParameter] array $cookies): BrowserSession
+    private function getSession(
+        #[SensitiveParameter]
+        array $cookies,
+    ): BrowserSession
     {
         return $this->application->sessions->authenticate($this->getCookie($cookies, BrowserSessionService::COOKIE_NAME));
     }
@@ -407,7 +679,11 @@ final class AccountController
      * @param string $name
      * @return string
      */
-    private function getCookie(#[SensitiveParameter] array $cookies, string $name): string
+    private function getCookie(
+        #[SensitiveParameter]
+        array  $cookies,
+        string $name,
+    ): string
     {
         return is_string($cookies[$name] ?? null) ? $cookies[$name] : '';
     }
@@ -419,7 +695,11 @@ final class AccountController
      * @param string $name
      * @return string
      */
-    private function getString(#[SensitiveParameter] array $fields, string $name): string
+    private function getString(
+        #[SensitiveParameter]
+        array  $fields,
+        string $name,
+    ): string
     {
         if (!is_string($fields[$name] ?? null) || trim($fields[$name]) === '') {
             throw new AccountException('The request is invalid.', 400);
@@ -478,7 +758,10 @@ final class AccountController
      * @param array $attempt
      * @return Response
      */
-    private function createLoginRedirect(#[SensitiveParameter] array $attempt): Response
+    private function createLoginRedirect(
+        #[SensitiveParameter]
+        array $attempt,
+    ): Response
     {
         return $this->redirect($attempt['authorizationUrl'], ['Set-Cookie' => LoginService::createCookie($attempt['browserSecret'])]);
     }
@@ -490,7 +773,11 @@ final class AccountController
      * @param array $data
      * @return Response
      */
-    private function renderPage(string $page, #[SensitiveParameter] array $data): Response
+    private function renderPage(
+        string $page,
+        #[SensitiveParameter]
+        array  $data,
+    ): Response
     {
         return Response::createHtml((new TemplateRenderer())->renderAccountPage($page, $data), headers: ['Referrer-Policy' => 'no-referrer']);
     }
