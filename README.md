@@ -14,7 +14,11 @@ Projects can now have named CI tokens too. Only the hash is stored and the secre
 
 There is a PHP build helper with examples for [GitHub Actions, GitLab CI and custom builds](examples/ci/README.md). It saves the request ID before asking for a number and keeps it for retries. Temporary failures get five retries, then the build stops. Its important to keep that ID when a runner gets replaced.
 
-The remaining counter and history controls, deployment checks and the frontend are still coming. The provider tests use mocked responses, so live GitHub and GitLab verification is still open. The CI examples have not been run on live runners yet.
+Administrators can check the next number without using it, edit the counter and do a confirmed hard reset. A reset needs a recent provider sign in and can reuse older numbers, but it keeps the original request IDs and history. Contributors can see their own builds. Other callers history is off by default and can be enabled per project.
+
+There are project and instance audit pages too. Instance administrators can preview and confirm deletion of old logs. Its only the logs that get removed, counters and permanent retries stay there. Projects can be archived and reactivated without losing their records.
+
+Deployment checks and the frontend are still coming. The provider tests use mocked responses, so live GitHub and GitLab verification is still open. The CI examples have not been run on live runners yet.
 
 ## Running the tests
 
