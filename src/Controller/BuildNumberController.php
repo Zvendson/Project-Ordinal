@@ -89,7 +89,8 @@ final class BuildNumberController
             $buildNumber = $service->allocateBuildNumber($parsedProjectId, $requestId, $caller);
         } catch (AuthenticationException) {
             return ApiError::createResponse('INVALID_AUTHENTICATION');
-
+        } catch (AllocationException $exception) {
+            return ApiError::createResponse($exception->errorCode);
         }
 
         return Response::createJson([

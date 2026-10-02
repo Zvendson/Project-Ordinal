@@ -95,7 +95,17 @@ final class BuildNumberControllerTest extends TestCase
 
 
 
-
+    /**
+     * Maps a verified request for a missing project to the agreed 404 error.
+     *
+     * @return void
+     */
+    public function testMapsMissingProject(): void
+    {
+        $response = $this->submitRequest(self::FIRST_REQUEST, '999');
+        self::assertSame(404, $response->statusCode);
+        self::assertSame('PROJECT_NOT_FOUND', json_decode($response->body, true, flags: JSON_THROW_ON_ERROR)['error']['code']);
+    }
 
     /**
      * Sends validated JSON through the real controller with a non-secret test credential.
