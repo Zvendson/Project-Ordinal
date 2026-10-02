@@ -10,7 +10,11 @@ The backend can now sign in through GitHub and GitLab, link repositories to proj
 
 Devices can get their own project credentials. The secret is shown once and only its hash is stored. Lifetimes can be positive days, 0 for one allocation, or -1 without expiration. Credentials and whole devices can be revoked. Developer requests still check repository write access, including retries.
 
-CI tokens, the remaining counter and history controls, deployment checks and the frontend are still coming. The provider tests use mocked responses, so live GitHub and GitLab verification is still open.
+Projects can now have named CI tokens too. Only the hash is stored and the secret is shown once. They expire after 90 days by default, can be renamed, rotated or revoked, and keep their request history when rotated. CI requests check the token locally, so a provider outage does not stop them.
+
+There is a PHP build helper with examples for [GitHub Actions, GitLab CI and custom builds](examples/ci/README.md). It saves the request ID before asking for a number and keeps it for retries. Temporary failures get five retries, then the build stops. Its important to keep that ID when a runner gets replaced.
+
+The remaining counter and history controls, deployment checks and the frontend are still coming. The provider tests use mocked responses, so live GitHub and GitLab verification is still open. The CI examples have not been run on live runners yet.
 
 ## Running the tests
 
