@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Ordinal\View;
 
 use Throwable;
+use SensitiveParameter;
 
 /** Renders private PHP templates and escapes values intended for HTML text or attributes. */
 final class TemplateRenderer
@@ -16,9 +17,9 @@ final class TemplateRenderer
      * @param array $data
      * @return string
      */
-    public function renderAccountPage(string $page, array $data): string
+    public function renderAccountPage(string $page, #[SensitiveParameter] array $data): string
     {
-        $templates = ['login' => 'login.php', 'account' => 'account.php', 'administration' => 'administration.php', 'projects' => 'projects.php', 'project' => 'project.php'];
+        $templates = ['login' => 'login.php', 'account' => 'account.php', 'administration' => 'administration.php', 'projects' => 'projects.php', 'project' => 'project.php', 'devices' => 'devices.php', 'device-credential' => 'device-credential.php'];
         if (!isset($templates[$page])) {
             throw new \InvalidArgumentException('Unknown account template.');
         }
@@ -64,7 +65,7 @@ final class TemplateRenderer
      * @return string
      * @throws Throwable
      */
-    private function renderTemplate(string $filename, array $data): string
+    private function renderTemplate(string $filename, #[SensitiveParameter] array $data): string
     {
         ob_start();
         try {

@@ -9,7 +9,16 @@ use Ordinal\View\TemplateRenderer;
 $csrfToken = TemplateRenderer::escape($data['session']->csrfToken);
 ?>
 <h2>Instance administration</h2>
-<nav><a href="/account">Account</a> · <a href="/projects">Projects</a></nav>
+<nav><a href="/account">Account</a> · <a href="/projects">Projects</a> · <a href="/devices">Devices</a></nav>
+<h3>Default build authentication</h3>
+<p>Projects inherit these settings unless they have an override. Lifetime changes apply to new credentials. Positive days expire from provider sign-in; 0 allows one allocation and its replay; -1 has no time expiration.</p>
+<form method="post" action="/devices/policy">
+    <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>">
+    <input type="hidden" name="projectId" value="">
+    <p><label>Authentication <select name="isRequired"><option value="1"<?= $data['settings']['is_authentication_required'] ? ' selected' : '' ?>>Required</option><option value="0"<?= !$data['settings']['is_authentication_required'] ? ' selected' : '' ?>>Disabled</option></select></label></p>
+    <p><label>Device lifetime in days <input name="lifetimeDays" value="<?= (int) $data['settings']['device_lifetime_days'] ?>" required></label></p>
+    <button type="submit">Save authentication defaults</button>
+</form>
 <h3>Provider connections</h3>
 <p>Registration credentials are managed by the server operator. Choose a configured registration to allow it here.</p>
 <ul>

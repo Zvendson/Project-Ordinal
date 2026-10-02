@@ -70,6 +70,10 @@ final class AccountController
                 'showProjects' => $this->showProjects($cookies),
                 'showProject' => $this->showProject($query, $cookies),
                 'createProject' => $this->createProject($fields, $cookies),
+                'showDevices' => $this->showDevices($query, $cookies),
+                'enrollDevice' => $this->enrollDevice($fields, $cookies),
+                'revokeDevice' => $this->revokeDevice($fields, $cookies),
+                'saveAuthenticationPolicy' => $this->saveAuthenticationPolicy($fields, $cookies),
                 default => $this->createError('Page not found.', 404),
             };
         } catch (AuthenticationException | ProviderAuthenticationException) {
@@ -220,7 +224,82 @@ final class AccountController
     private function showProject(array $query, #[SensitiveParameter] array $cookies): Response
     {
         $session = $this->getSession($cookies);
-        return $this->renderPage('project', $this->application->projects->getProject($session, $this->getPositiveInteger($query, 'projectId')) + ['session' => $session]);
+        return $this->renderPage('project', $this->application->projects->getProject($session, $this->getPositiveInteger($query, 'projectId')) + ['session' => $session, 'isAdministrator' => $this->application->administration->isInstanceAdministrator($session->userId)]);
+    }
+
+    /**
+     * Shows metadata and enrollment/revocation forms without stored secrets.
+     *
+     * @param array $query
+     * @param array $cookies
+     * @return Response
+     */
+    private function showDevices(array $query, #[SensitiveParameter] array $cookies): Response
+    {
+        $session = $this->getSession($cookies);
+        $projectId = isset($query['projectId']) ? $this->getPositiveInteger($query, 'projectId') : null;
+        return $this->renderPage('devices', $this->application->devices->getDeviceData($session, $projectId) + ['session' => $session, 'projectId' => $projectId]);
+    }
+
+    /**
+     * Displays the original project credential once after provider-backed enrollment.
+     *
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function enrollDevice(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $deviceId = ($fields['deviceId'] ?? '') === '' ? null : $this->getPositiveInteger($fields, 'deviceId');
+        $name = $deviceId === null ? $this->getString($fields, 'name') : '';
+        return $this->renderPage('device-credential', $this->application->devices->enrollDevice($session, $this->getPositiveInteger($fields, 'projectId'), $name, $deviceId));
+    }
+
+    /**
+     * Revokes one credential or all credentials of a device after CSRF and ownership checks.
+     *
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function revokeDevice(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        switch ($this->getString($fields, 'action')) {
+            case 'device':
+                $this->application->devices->revokeDevice($session, $this->getPositiveInteger($fields, 'deviceId'));
+                break;
+            case 'credential':
+                $this->application->devices->revokeCredential($session, $this->getPositiveInteger($fields, 'credentialId'));
+                break;
+            default:
+                throw new AccountException('The request is invalid.', 400);
+        }
+        return $this->redirect('/devices');
+    }
+
+    /**
+     * Parses explicit inheritance and applies protected instance defaults or project overrides.
+     *
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function saveAuthenticationPolicy(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $projectId = ($fields['projectId'] ?? '') === '' ? null : $this->getPositiveInteger($fields, 'projectId');
+        $isRequired = $this->getString($fields, 'isRequired');
+        if (!in_array($isRequired, ['inherit', '0', '1'], true)) {
+            throw new AccountException('The request is invalid.', 400);
+        }
+        $days = $this->getString($fields, 'lifetimeDays');
+        if ($days !== 'inherit' && (preg_match('/^(?:-1|0|[1-9][0-9]*)$/D', $days) !== 1 || filter_var($days, FILTER_VALIDATE_INT) === false)) {
+            throw new AccountException('The request is invalid.', 400);
+        }
+        $this->application->devices->saveAuthenticationPolicy($session, $projectId, $isRequired === 'inherit' ? null : $isRequired === '1', $days === 'inherit' ? null : (int) $days);
+        return $this->redirect($projectId === null ? '/administration' : '/projects/' . $projectId);
     }
 
     /**
@@ -352,7 +431,7 @@ final class AccountController
      * @param array $data
      * @return Response
      */
-    private function renderPage(string $page, array $data): Response
+    private function renderPage(string $page, #[SensitiveParameter] array $data): Response
     {
         return Response::createHtml((new TemplateRenderer())->renderAccountPage($page, $data), headers: ['Referrer-Policy' => 'no-referrer']);
     }
