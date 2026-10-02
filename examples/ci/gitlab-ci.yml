@@ -1,0 +1,24 @@
+# Use a trusted Linux shell runner tagged ordinal-build, with PHP 8.5 and curl.
+# Configure ORDINAL_TOKEN as a masked, protected CI/CD variable.
+# Supply a NEW ORDINAL_REQUEST_ID UUID v4 when starting each pipeline.
+# Retrying its build job preserves that pipeline variable, including on a replacement runner.
+stages:
+  - build
+
+ordinal_build:
+  stage: build
+  tags:
+    - ordinal-build
+  variables:
+    ORDINAL_REQUEST_DIRECTORY: "$CI_PROJECT_DIR/.ordinal"
+  script:
+    - 'test -n "$ORDINAL_REQUEST_ID" || { echo "Supply the original request UUID for retries, or a new UUID for a new build" >&2; exit 1; }'
+    - export ORDINAL_BUILD_ATTEMPT="$CI_PIPELINE_ID-release"
+    - BUILD_NUMBER=$(php bin/request-build-number.php) || exit 1
+    # Replace this with the real build command; it only runs after allocation succeeds.
+    - 'printf "Building with number %s\n" "$BUILD_NUMBER"'
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - .ordinal/*.json

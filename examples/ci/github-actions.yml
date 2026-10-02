@@ -1,0 +1,50 @@
+# GitHub.com example. Use a trusted Linux runner with PHP 8.5 and curl enabled.
+# Each new build gets a new UUID input. Rerunning this run keeps the same input.
+name: Build with Ordinal
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: New UUID v4 for this build, or the original UUID for recovery
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, ordinal-build]
+    env:
+      ORDINAL_URL: ${{ vars.ORDINAL_URL }}
+      ORDINAL_PROJECT_ID: ${{ vars.ORDINAL_PROJECT_ID }}
+      ORDINAL_TOKEN: ${{ secrets.ORDINAL_TOKEN }}
+      ORDINAL_BUILD_ATTEMPT: ${{ github.run_id }}-release
+      ORDINAL_REQUEST_ID: ${{ inputs.request_id }}
+      ORDINAL_REQUEST_DIRECTORY: ${{ github.workspace }}/.ordinal
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Request the build number
+        id: ordinal
+        shell: bash
+        run: |
+          set -euo pipefail
+          number=$(php bin/request-build-number.php)
+          printf 'BUILD_NUMBER=%s\n' "$number" >> "$GITHUB_ENV"
+      - name: Build
+        shell: bash
+        run: |
+          # Replace this with the real build command; it only runs after allocation succeeds.
+          printf 'Building with number %s\n' "$BUILD_NUMBER"
+      - name: Preserve request identity for recovery
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ordinal-request-state-${{ github.run_attempt }}
+          path: .ordinal/*.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
