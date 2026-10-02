@@ -15,6 +15,7 @@ final class Router
     private const array ROUTES = [
         '/' => ['GET' => 'GET/home.php'],
         '/api/projects/{projectId}/build-numbers' => ['POST' => 'POST/build-numbers.php'],
+        '/api/projects/{projectId}/build-numbers/next' => ['GET' => 'GET/build-number-preview.php'],
         '/login' => ['GET' => 'GET/login.php'],
         '/login/start' => ['GET' => 'GET/login-start.php'],
         '/login/callback' => ['GET' => 'GET/login-callback.php'],
@@ -24,6 +25,13 @@ final class Router
         '/administration' => ['GET' => 'GET/administration.php', 'POST' => 'POST/administration.php'],
         '/projects' => ['GET' => 'GET/projects.php', 'POST' => 'POST/projects.php'],
         '/projects/{projectId}' => ['GET' => 'GET/project.php'],
+        '/projects/{projectId}/counter' => ['GET' => 'GET/counter.php', 'POST' => 'POST/counter.php'],
+        '/projects/{projectId}/history' => ['GET' => 'GET/history.php'],
+        '/projects/{projectId}/logs' => ['GET' => 'GET/project-logs.php'],
+        '/projects/{projectId}/history-policy' => ['POST' => 'POST/history-policy.php'],
+        '/projects/{projectId}/archive' => ['POST' => 'POST/project-archive.php'],
+        '/logs' => ['GET' => 'GET/instance-logs.php'],
+        '/logs/cleanup' => ['GET' => 'GET/log-cleanup.php', 'POST' => 'POST/log-cleanup.php'],
         '/devices' => ['GET' => 'GET/devices.php'],
         '/devices/enroll' => ['POST' => 'POST/device-enrollment.php'],
         '/devices/revoke' => ['POST' => 'POST/device-revocation.php'],
@@ -78,6 +86,10 @@ final class Router
         }
 
         if (!isset($endpoints[$method])) {
+            if (($endpoints['POST'] ?? null) === 'POST/build-numbers.php') {
+                return (new \Ordinal\Controller\BuildNumberController(new \Ordinal\Security\RuntimeAllocationAuthorizer($this->accountApplication, $isSecure)))
+                    ->createMethodError($routeParameters['projectId']);
+            }
             return $this->createError(
                 $path,
                 Response::STATUS_METHOD_NOT_ALLOWED,
