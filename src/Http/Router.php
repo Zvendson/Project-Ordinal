@@ -6,6 +6,7 @@ namespace Ordinal\Http;
 
 use Ordinal\View\TemplateRenderer;
 use SensitiveParameter;
+use Ordinal\Service\AccountApplication;
 
 /** Matches explicit method/path pairs to endpoint files outside the public root. */
 final class Router
@@ -14,7 +15,28 @@ final class Router
     private const array ROUTES = [
         '/' => ['GET' => 'GET/home.php'],
         '/api/projects/{projectId}/build-numbers' => ['POST' => 'POST/build-numbers.php'],
+        '/login' => ['GET' => 'GET/login.php'],
+        '/login/start' => ['GET' => 'GET/login-start.php'],
+        '/login/callback' => ['GET' => 'GET/login-callback.php'],
+        '/account' => ['GET' => 'GET/account.php'],
+        '/account/reauthenticate' => ['POST' => 'POST/reauthenticate.php'],
+        '/account/logout' => ['POST' => 'POST/logout.php'],
+        '/administration' => ['GET' => 'GET/administration.php', 'POST' => 'POST/administration.php'],
+        '/projects' => ['GET' => 'GET/projects.php', 'POST' => 'POST/projects.php'],
+        '/projects/{projectId}' => ['GET' => 'GET/project.php'],
     ];
+    /** Bounds browser form bodies before parsing request fields. */
+    private const int MAX_FORM_BYTES = 65_536;
+
+    /**
+     * Injects account services for route tests; ordinary routes keep lazy configuration.
+     *
+     * @param ?AccountApplication $accountApplication
+     */
+    public function __construct(
+        /** Provides optional request-scoped account services to endpoint controllers. */
+        private readonly ?AccountApplication $accountApplication = null,
+    ) {}
 
     /**
      * Dispatches a registered endpoint or returns a path/method error.
@@ -24,6 +46,8 @@ final class Router
      * @param string $body
      * @param ?string $authorizationHeader
      * @param ?string $contentType
+     * @param array $cookies
+     * @param bool $isSecure
      * @return Response
      */
     public function dispatch(
@@ -33,6 +57,9 @@ final class Router
         #[SensitiveParameter]
         ?string $authorizationHeader = null,
         ?string $contentType         = null,
+        #[SensitiveParameter]
+        array   $cookies             = [],
+        bool    $isSecure            = false,
     ): Response
     {
         $path            = explode('?', $requestTarget, 2)[0];
@@ -54,6 +81,16 @@ final class Router
             );
         }
 
+        $query = [];
+        $fields = [];
+        parse_str(explode('?', $requestTarget, 2)[1] ?? '', $query);
+        $query = $routeParameters + $query;
+        if ($method === 'POST' && !str_starts_with($path, '/api/')) {
+            if (strlen($body) > self::MAX_FORM_BYTES || strtolower(trim(explode(';', $contentType ?? '', 2)[0])) !== 'application/x-www-form-urlencoded') {
+                return Response::createHtml((new TemplateRenderer())->renderError('The request is invalid.'), 400);
+            }
+            parse_str($body, $fields);
+        }
         return require dirname(__DIR__, 2) . '/endpoints/' . $endpoints[$method];
     }
 

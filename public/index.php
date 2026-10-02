@@ -26,6 +26,8 @@ try {
         $body,
         $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null,
         $_SERVER['CONTENT_TYPE'] ?? null,
+        $_COOKIE,
+        ($_SERVER['HTTPS'] ?? '') === 'on' || ($_SERVER['SERVER_PORT'] ?? '') === '443',
     );
 } catch (Throwable) {
     $path = explode('?', $requestTarget, 2)[0];
@@ -37,7 +39,9 @@ try {
 http_response_code($response->statusCode);
 
 foreach ($response->headers as $headerName => $headerValue) {
-    header($headerName . ': ' . $headerValue);
+    foreach ((array) $headerValue as $value) {
+        header($headerName . ': ' . $value, $headerName !== 'Set-Cookie');
+    }
 }
 
 echo $response->body;

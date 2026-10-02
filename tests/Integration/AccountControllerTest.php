@@ -192,7 +192,17 @@ final class AccountControllerTest extends TestCase
         self::assertSame(0, (int) $this->connection->query('SELECT count(*) FROM users')->fetchColumn());
     }
 
-
+    /**
+     * Integrates explicit GET/POST endpoints with the router without accepting GET mutations.
+     *
+     * @return void
+     */
+    public function testRoutesLoginAndRejectsGetLogout(): void
+    {
+        $router = new Router($this->application);
+        self::assertSame(200, $router->dispatch('GET', '/login', cookies: [], isSecure: true)->statusCode);
+        self::assertSame(405, $router->dispatch('GET', '/account/logout', isSecure: true)->statusCode);
+    }
 
     /**
      * Rejects a provider-denied callback and consumes its state so it cannot be replayed.
@@ -208,7 +218,43 @@ final class AccountControllerTest extends TestCase
         self::assertSame(0, (int) $this->connection->query('SELECT count(*) FROM oauth_attempts')->fetchColumn());
     }
 
+    /**
+     * Routes URL-encoded forms and protects against query parameters overriding a matched project ID.
+     *
+     * @return void
+     */
+    public function testRoutesBrowserFormsWithCsrfAndMethodValidation(): void
+    {
+        $secret = $this->signIn();
+        $session = $this->application->sessions->authenticate($secret);
+        $router = new Router($this->application);
+        $cookies = [BrowserSessionService::COOKIE_NAME => $secret];
+        $body = http_build_query(['csrfToken' => $session->csrfToken, 'action' => 'sessionLimits', 'idleMinutes' => '12', 'absoluteMinutes' => '180']);
+        self::assertSame(303, $router->dispatch('POST', '/administration', $body, contentType: 'application/x-www-form-urlencoded', cookies: $cookies, isSecure: true)->statusCode);
+        self::assertSame(400, $router->dispatch('POST', '/administration', '{}', contentType: 'application/json', cookies: $cookies, isSecure: true)->statusCode);
+        self::assertSame(401, $router->dispatch('GET', '/projects/1?projectId=2', isSecure: true)->statusCode);
+    }
 
-
-
+    /**
+     * Links a repository through the real routed form and prevents query input overriding the route ID.
+     *
+     * @return void
+     */
+    public function testCreatesAndShowsProjectThroughBrowserRoutes(): void
+    {
+        $secret = $this->signIn();
+        $session = $this->application->sessions->authenticate($secret);
+        $router = new Router($this->application);
+        $cookies = [BrowserSessionService::COOKIE_NAME => $secret];
+        $body = http_build_query(['csrfToken' => $session->csrfToken, 'connectionId' => '1', 'repositoryId' => '77', 'name' => '<Project>']);
+        $response = $router->dispatch('POST', '/projects', $body, contentType: 'application/x-www-form-urlencoded', cookies: $cookies, isSecure: true);
+        self::assertSame(303, $response->statusCode);
+        self::assertSame('/projects/1', $response->headers['Location']);
+        $project = $router->dispatch('GET', '/projects/1?projectId=999', cookies: $cookies, isSecure: true);
+        self::assertSame(200, $project->statusCode);
+        self::assertStringContainsString('&lt;Project&gt;', $project->body);
+        self::assertStringNotContainsString('<Project>', $project->body);
+        self::assertSame(409, $router->dispatch('POST', '/projects', $body, contentType: 'application/x-www-form-urlencoded', cookies: $cookies, isSecure: true)->statusCode);
+        self::assertSame(1, (int) $this->connection->query('SELECT next_build_number FROM projects')->fetchColumn());
+    }
 }
