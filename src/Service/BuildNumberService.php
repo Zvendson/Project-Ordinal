@@ -8,10 +8,11 @@ use Ordinal\Database\Transaction;
 use Ordinal\Model\AllocationCaller;
 use Ordinal\Repository\AllocationRepository;
 use Ordinal\Repository\DeviceRepository;
+use Ordinal\Repository\AutomationRepository;
 use Ordinal\Security\AuthenticationException;
 use PDO;
 
-/** Allocates or replays numbers atomically and rechecks locked device validity and consumption. */
+/** Allocates or replays numbers atomically and rechecks locked credential validity and device consumption. */
 final class BuildNumberService
 {
     /** Defines the inclusive uint32 maximum. */
@@ -51,6 +52,13 @@ final class BuildNumberService
              */
             function (PDO $connection) use ($projectId, $requestId, $caller, $repository, &$buildNumber): void {
                 $devices = new DeviceRepository($connection);
+                if ($caller->automationTokenId !== null) {
+                    if ($caller->automationSecretHash === null) {
+                        throw new AuthenticationException('Verified automation authentication is required.');
+                    }
+                    $automation = new AutomationRepository($connection);
+                    $automation->requireActiveToken($automation->findToken($caller->automationTokenId, true), $projectId, $caller->automationSecretHash);
+                }
                 $credential = null;
                 if ($caller->deviceCredentialId !== null) {
                     $credential = $devices->findCredential($caller->deviceCredentialId, true);

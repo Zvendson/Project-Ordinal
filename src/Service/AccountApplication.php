@@ -14,12 +14,13 @@ use Ordinal\Repository\AdministrationRepository;
 use Ordinal\Repository\AuthorizationRepository;
 use Ordinal\Repository\BrowserSessionRepository;
 use Ordinal\Repository\DeviceRepository;
+use Ordinal\Repository\AutomationRepository;
 use Ordinal\Repository\IdentityRepository;
 use Ordinal\Repository\LoginRepository;
 use Ordinal\Repository\ProjectRepository;
 use Ordinal\Repository\ProviderConnectionRepository;
 use Ordinal\Security\TokenCipher;
-use Ordinal\Security\DeviceAllocationAuthorizer;
+use Ordinal\Security\ProjectAllocationAuthorizer;
 use PDO;
 use SensitiveParameter;
 
@@ -27,23 +28,25 @@ use SensitiveParameter;
 final readonly class AccountApplication
 {
     /** Resolves allowed concrete provider integrations. */
-    public ProviderRegistry           $providers;
+    public ProviderRegistry            $providers;
     /** Coordinates encrypted reusable credentials. */
-    public AuthorizationService       $authorizations;
+    public AuthorizationService        $authorizations;
     /** Manages opaque server-side browser sessions. */
-    public BrowserSessionService      $sessions;
+    public BrowserSessionService       $sessions;
     /** Coordinates state/PKCE callbacks. */
-    public LoginService               $login;
+    public LoginService                $login;
     /** Protects instance grants and connection/session configuration. */
-    public AdministrationService      $administration;
+    public AdministrationService       $administration;
     /** Links immutable repositories and checks current project roles. */
-    public ProjectService             $projects;
+    public ProjectService              $projects;
     /** Manages provider-approved project credentials and revocation. */
-    public DeviceService              $devices;
-    /** Verifies device credentials and live repository write permission. */
-    public DeviceAllocationAuthorizer $allocationAuthorizer;
+    public DeviceService               $devices;
+    /** Verifies local CI tokens or device credentials with live repository write permission. */
+    public ProjectAllocationAuthorizer $allocationAuthorizer;
+    /** Manages named project-scoped automation tokens and current policy. */
+    public AutomationService           $automation;
     /** Allocates and consumes single-use credentials atomically. */
-    public BuildNumberService         $buildNumbers;
+    public BuildNumberService          $buildNumbers;
 
     /**
      * Wires domain repositories and services using one request-scoped database connection.
@@ -74,7 +77,9 @@ final readonly class AccountApplication
         $deviceRepository = new DeviceRepository($connection);
         $access = new RepositoryAccessService($identities, $this->providers, $this->authorizations);
         $this->devices = new DeviceService($connection, $deviceRepository, $access, $this->sessions, $this->administration, $administrationRepository, $this->projects);
-        $this->allocationAuthorizer = new DeviceAllocationAuthorizer($deviceRepository, $access);
+        $automationRepository = new AutomationRepository($connection);
+        $this->automation = new AutomationService($connection, $automationRepository, new ProjectRepository($connection), $this->projects, $this->sessions, $this->administration, $administrationRepository);
+        $this->allocationAuthorizer = new ProjectAllocationAuthorizer($deviceRepository, $access, $automationRepository);
         $this->buildNumbers = new BuildNumberService($connection);
     }
 

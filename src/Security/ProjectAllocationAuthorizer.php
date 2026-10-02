@@ -8,24 +8,28 @@ use Ordinal\Model\AllocationCaller;
 use Ordinal\Provider\ProviderAuthenticationException;
 use Ordinal\Provider\ProviderUnavailableException;
 use Ordinal\Repository\DeviceRepository;
+use Ordinal\Repository\AutomationRepository;
 use Ordinal\Service\AllocationException;
 use Ordinal\Service\RepositoryAccessService;
 use SensitiveParameter;
 
-/** Validates local device credentials before fresh provider authorization on every request. */
-final class DeviceAllocationAuthorizer extends AllocationAuthorizer
+/** Authorizes anonymous policy, local CI credentials, or devices with fresh provider verification. */
+final class ProjectAllocationAuthorizer extends AllocationAuthorizer
 {
     /**
-     * Uses local validity and current provider write permission.
+     * Checks CI tokens locally and verifies current provider write permission for devices.
      *
      * @param DeviceRepository $repository
      * @param RepositoryAccessService $access
+     * @param AutomationRepository $automation
      */
     public function __construct(
         /** Reads project policy and hashed credential records. */
         private readonly DeviceRepository        $repository,
         /** Verifies repository write permission without administrator shortcuts. */
         private readonly RepositoryAccessService $access,
+        /** Validates project-scoped automation locally without contacting providers. */
+        private readonly AutomationRepository    $automation,
     ) {}
 
     /**
@@ -44,13 +48,19 @@ final class DeviceAllocationAuthorizer extends AllocationAuthorizer
         if (!$project['is_authentication_required']) {
             return new AllocationCaller();
         }
-        $token = DeviceToken::parseToken($bearerToken);
-        $credential = $this->repository->findCredential($token['id']);
+        $isAutomation = str_starts_with($bearerToken ?? '', 'automation.');
+        $token = $isAutomation ? AutomationToken::parseToken($bearerToken) : DeviceToken::parseToken($bearerToken);
+        $credential = $isAutomation ? $this->automation->findToken($token['id']) : $this->repository->findCredential($token['id']);
         if ($credential === null || !hash_equals($credential['secret_hash'], hash('sha256', $token['secret']))) {
-            throw new AuthenticationException('Device authentication is required or invalid.');
+            throw new AuthenticationException('Project authentication is required or invalid.');
         }
         if ((int) $credential['project_id'] !== $projectId) {
             throw new AllocationException(AllocationException::ACCESS_DENIED);
+        }
+        if ($isAutomation) {
+            $hash = hash('sha256', $token['secret']);
+            $this->automation->requireActiveToken($credential, $projectId, $hash);
+            return new AllocationCaller(automationTokenId: $token['id'], automationSecretHash: $hash);
         }
         $userId = (int) $credential['user_id'];
         $this->repository->requireActiveCredential($credential, $projectId, $userId);

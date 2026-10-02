@@ -90,7 +90,7 @@ final class BuildNumberServiceTest extends TestCase
     public function testSeparatesCallerNamespaces(): void
     {
         foreach ([new AllocationCaller(userId: 1), new AllocationCaller(userId: 2),
-            new AllocationCaller(automationTokenId: 1), new AllocationCaller()] as $index => $caller) {
+            new AllocationCaller(automationTokenId: 1, automationSecretHash: str_repeat('a', 64)), new AllocationCaller()] as $index => $caller) {
             self::assertSame($index + 1, $this->service->allocateBuildNumber(1, self::FIRST_REQUEST, $caller));
             self::assertSame($index + 1, $this->service->allocateBuildNumber(1, self::FIRST_REQUEST, $caller));
         }
@@ -145,7 +145,7 @@ final class BuildNumberServiceTest extends TestCase
      */
     public function testEnforcesRetryUniquenessInDatabase(): void
     {
-        foreach ([new AllocationCaller(), new AllocationCaller(userId: 1), new AllocationCaller(automationTokenId: 1)] as $caller) {
+        foreach ([new AllocationCaller(), new AllocationCaller(userId: 1), new AllocationCaller(automationTokenId: 1, automationSecretHash: str_repeat('a', 64))] as $caller) {
             $id = $this->service->allocateBuildNumber(1, self::FIRST_REQUEST, $caller);
             $statement = $this->connection->prepare('INSERT INTO allocations (project_id, request_id, build_number, caller_kind, user_id, automation_token_id) VALUES (1, :requestId, :number, :kind, :userId, :tokenId)');
             try {
