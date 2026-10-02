@@ -20,8 +20,8 @@ final class RouterTest extends TestCase
         $response = (new Router())->dispatch('GET', '/');
 
         self::assertSame(200, $response->statusCode);
-        self::assertSame('Project: Ordinal', $response->body);
-        self::assertSame(['Content-Type' => 'text/plain; charset=UTF-8'], $response->headers);
+        self::assertStringContainsString('<h1>Project: Ordinal</h1>', $response->body);
+        self::assertSame('text/html; charset=UTF-8', $response->headers['Content-Type']);
     }
 
     /**
@@ -45,7 +45,7 @@ final class RouterTest extends TestCase
             $response = (new Router())->dispatch($method, '/');
 
             self::assertSame(405, $response->statusCode);
-            self::assertSame('Method not allowed.', $response->body);
+            self::assertStringContainsString('Method not allowed.', $response->body);
             self::assertSame('GET', $response->headers['Allow']);
         }
     }
@@ -63,7 +63,22 @@ final class RouterTest extends TestCase
             $response = (new Router())->dispatch('GET', $path);
 
             self::assertSame(404, $response->statusCode, $path);
-            self::assertSame('Page not found.', $response->body);
+            self::assertStringContainsString('Page not found.', $response->body);
+        }
+    }
+
+    /**
+     * Returns JSON for unknown API routes, without pretending a project was looked up.
+     *
+     * @return void
+     */
+    public function testReturnsJsonForUnknownApiRoutes(): void
+    {
+        foreach (['/api', '/api/missing'] as $path) {
+            $response = (new Router())->dispatch('GET', $path);
+            self::assertSame(404, $response->statusCode);
+            self::assertSame('application/json; charset=UTF-8', $response->headers['Content-Type']);
+            self::assertSame('NOT_FOUND', json_decode($response->body, true, flags: JSON_THROW_ON_ERROR)['error']['code']);
         }
     }
 }

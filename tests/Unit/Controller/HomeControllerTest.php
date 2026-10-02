@@ -7,7 +7,7 @@ namespace Ordinal\Tests\Unit\Controller;
 use Ordinal\Controller\HomeController;
 use PHPUnit\Framework\TestCase;
 
-/** Verifies the initial home response before browser templates are added. */
+/** Verifies the initial unstyled home response. */
 final class HomeControllerTest extends TestCase
 {
     /**
@@ -20,7 +20,7 @@ final class HomeControllerTest extends TestCase
         $response = (new HomeController())->showHome();
 
         self::assertSame(200, $response->statusCode);
-        self::assertSame('Project: Ordinal', $response->body);
-        self::assertSame('text/plain; charset=UTF-8', $response->headers['Content-Type']);
+        self::assertStringContainsString('<h1>Project: Ordinal</h1>', $response->body);
+        self::assertSame('text/html; charset=UTF-8', $response->headers['Content-Type']);
     }
 }
