@@ -9,7 +9,6 @@ use Ordinal\View\TemplateRenderer;
 $csrfToken = TemplateRenderer::escape($data['session']->csrfToken);
 ?>
 <h2>Devices</h2>
-<nav><a href="/account">Account</a> · <a href="/projects">Projects</a></nav>
 <h3>Approve a project credential</h3>
 <p>Use a new readable device name, or enter an existing device ID to keep its identity. Each credential belongs to one project. The original secret is shown once.</p>
 <p>A lifetime of 0 requires a provider sign-in within five minutes, once per project and sign-in. <a href="/account">Sign in again</a> before approving the next single-allocation credential.</p>

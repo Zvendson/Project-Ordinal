@@ -30,7 +30,7 @@ final class TemplateRenderer
         return $this->renderTemplate($templates[$page], $data);
     }
     /**
-     * Renders the initial unstyled home page.
+     * Renders the home page through the shared accessible shell.
      *
      * @return string
      */

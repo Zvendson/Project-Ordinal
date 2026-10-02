@@ -12,7 +12,6 @@ $session = $data['session'];
 <p>Signed in as <?= TemplateRenderer::escape($session->displayName) ?>.</p>
 <p>Provider connection: <?= $session->providerConnectionId ?>. Provider user ID: <?= TemplateRenderer::escape($session->providerUserId) ?>.</p>
 <p>Session ends at <?= TemplateRenderer::escape($session->expiresAt->format('Y-m-d H:i:s T')) ?>, or earlier when inactive.</p>
-<nav><a href="/projects">Projects</a> · <a href="/devices">Devices</a><?php if ($data['isAdministrator']): ?> · <a href="/administration">Instance administration</a><?php endif; ?></nav>
 <form method="post" action="/account/reauthenticate">
     <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($session->csrfToken) ?>">
     <p><button type="submit">Sign in again for sensitive changes</button></p>

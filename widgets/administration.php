@@ -9,7 +9,6 @@ use Ordinal\View\TemplateRenderer;
 $csrfToken = TemplateRenderer::escape($data['session']->csrfToken);
 ?>
 <h2>Instance administration</h2>
-<nav><a href="/account">Account</a> · <a href="/projects">Projects</a> · <a href="/devices">Devices</a></nav>
 <h3>Default build authentication</h3>
 <p>Projects inherit these settings unless they have an override. Lifetime changes apply to new credentials. Positive days expire from provider sign-in; 0 allows one allocation and its replay; -1 has no time expiration.</p>
 <form method="post" action="/devices/policy">

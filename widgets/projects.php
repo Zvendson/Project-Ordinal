@@ -7,12 +7,12 @@ declare(strict_types=1);
 use Ordinal\View\TemplateRenderer;
 ?>
 <h2>Projects</h2>
-<nav><a href="/account">Account</a><?php if ($data['isAdministrator']): ?> · <a href="/administration">Instance administration</a><?php endif; ?></nav>
 <ul>
 <?php foreach ($data['projects'] as $project): ?>
     <li><a href="/projects/<?= (int) $project['id'] ?>"><?= TemplateRenderer::escape($project['name']) ?></a><?= $project['archived_at'] === null ? '' : ' (archived)' ?></li>
 <?php endforeach; ?>
 </ul>
+<?php if ($data['projects'] === []): ?><p>No accessible projects yet.</p><?php endif; ?>
 <?php if ($data['isAdministrator']): ?>
 <h3>Link a repository</h3>
 <p>Sign in through the repository's provider connection before linking it. The repository must be accessible to that provider authorization.</p>
