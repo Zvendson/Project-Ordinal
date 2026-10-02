@@ -52,7 +52,7 @@ final class ApplicationSchemaTest extends TestCase
     public function testCreatesSchemaAndAppliesOnce(): void
     {
         $tables = $this->connection->query("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename")->fetchAll(PDO::FETCH_COLUMN);
-        self::assertSame(['allocations', 'audit_events', 'automation_tokens', 'browser_sessions',
+        self::assertSame(['administrator_login_limits', 'administrator_sessions', 'allocations', 'audit_events', 'automation_tokens', 'browser_sessions',
             'device_credentials', 'devices', 'instance_administrators', 'instance_settings',
             'oauth_attempts', 'projects', 'provider_authorizations', 'provider_connections', 'schema_migrations', 'users'], $tables);
         self::assertSame(0, (new MigrationRunner($this->connection))->applyMigrations(dirname(__DIR__, 2) . '/database/migrations'));
