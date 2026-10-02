@@ -16,9 +16,9 @@ use PDO;
 final class AccountFixture
 {
     /** Holds the guarded test connection. */
-    public readonly PDO                $connection;
+    public ?PDO                        $connection;
     /** Composes real services against a fake provider. */
-    public readonly AccountApplication $application;
+    public ?AccountApplication         $application;
     /** Names only this fixture's random schema. */
     public readonly string             $schemaName;
     /** Controls current repository role. */
@@ -40,14 +40,20 @@ final class AccountFixture
     }
 
     /**
-     * Removes only this fixture's schema after rolling back unfinished work.
+     * Removes only this schema and releases the application/connection resources after unfinished work.
      *
      * @return void
      */
     public function close(): void
     {
-        if ($this->connection->inTransaction()) { $this->connection->rollBack(); }
-        $this->connection->exec('DROP SCHEMA ' . $this->schemaName . ' CASCADE');
+        if ($this->connection === null) { return; }
+        try {
+            if ($this->connection->inTransaction()) { $this->connection->rollBack(); }
+            $this->connection->exec('DROP SCHEMA ' . $this->schemaName . ' CASCADE');
+        } finally {
+            $this->application = null;
+            $this->connection = null;
+        }
     }
 
     /**
