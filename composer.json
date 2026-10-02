@@ -5,9 +5,10 @@
     "license": "GPL-3.0-only",
     "require": {
         "php": "~8.5.0",
+        "ext-curl": "*",
+        "ext-openssl": "*",
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
-        "ext-openssl": "*",
         "ext-sodium": "*"
     },
     "require-dev": {
