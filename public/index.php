@@ -16,7 +16,17 @@ $method        = $_SERVER['REQUEST_METHOD'] ?? '';
 $requestTarget = $_SERVER['REQUEST_URI'] ?? '';
 
 try {
-    $response = (new Router())->dispatch($method, $requestTarget);
+    $body = file_get_contents('php://input');
+    if ($body === false) {
+        throw new RuntimeException('Request body could not be read.');
+    }
+    $response = (new Router())->dispatch(
+        $method,
+        $requestTarget,
+        $body,
+        $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null,
+        $_SERVER['CONTENT_TYPE'] ?? null,
+    );
 } catch (Throwable) {
     $path = explode('?', $requestTarget, 2)[0];
     $response = $path === '/api' || str_starts_with($path, '/api/')
