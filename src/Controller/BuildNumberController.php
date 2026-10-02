@@ -55,27 +55,31 @@ final class BuildNumberController
         ?string $authorizationHeader,
         ?string $contentType,
     ): Response {
+        $caller = null;
+        $requestId = null;
         $parsedProjectId = filter_var($projectId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $auditProjectId = preg_match('/^[1-9][0-9]*$/D', $projectId) === 1 && $parsedProjectId !== false ? $parsedProjectId : null;
         if (preg_match('/^[1-9][0-9]*$/D', $projectId) !== 1 || $parsedProjectId === false
             || strtolower(trim(explode(';', $contentType ?? '', 2)[0])) !== 'application/json') {
-            return ApiError::createResponse('INVALID_REQUEST');
+            return $this->createAllocationError('INVALID_REQUEST', $auditProjectId);
         }
 
         try {
             $request = json_decode($body, flags: JSON_THROW_ON_ERROR);
         } catch (JsonException) {
-            return ApiError::createResponse('INVALID_REQUEST');
+            return $this->createAllocationError('INVALID_REQUEST', $auditProjectId);
         }
 
         if (!$request instanceof stdClass || !isset($request->requestId) || !is_string($request->requestId)
             || !RequestId::isValid($request->requestId)) {
-            return ApiError::createResponse('INVALID_REQUEST');
+            return $this->createAllocationError('INVALID_REQUEST', $auditProjectId);
         }
+        $requestId = strtolower($request->requestId);
 
         $bearerToken = null;
         if ($authorizationHeader !== null) {
             if (preg_match(self::BEARER_PATTERN, $authorizationHeader, $matches) !== 1) {
-                return ApiError::createResponse('INVALID_AUTHENTICATION');
+                return $this->createAllocationError('INVALID_AUTHENTICATION', $auditProjectId, $requestId);
             }
             $bearerToken = $matches[1];
         }
@@ -87,10 +91,12 @@ final class BuildNumberController
                 ? $this->authorizer->getBuildNumberService()
                 : new BuildNumberService(ConnectionFactory::createConnection(ConfigurationLoader::loadFromEnvironment())));
             $buildNumber = $service->allocateBuildNumber($parsedProjectId, $requestId, $caller);
-        } catch (AuthenticationException) {
-            return ApiError::createResponse('INVALID_AUTHENTICATION');
+        } catch (AuthenticationException $exception) {
+            return $this->createAllocationError('INVALID_AUTHENTICATION', $auditProjectId, $requestId, $caller ?? $this->authorizer->getVerifiedCaller(), reason: $exception->reason);
         } catch (AllocationException $exception) {
-            return ApiError::createResponse($exception->errorCode);
+            return $this->createAllocationError($exception->errorCode, $auditProjectId, $requestId, $caller ?? $this->authorizer->getVerifiedCaller());
+        } catch (\Throwable) {
+            return $this->createAllocationError('INTERNAL_ERROR', $auditProjectId, $requestId, $caller ?? $this->authorizer->getVerifiedCaller());
         }
 
         return Response::createJson([
@@ -98,5 +104,44 @@ final class BuildNumberController
             'requestId'   => $requestId,
             'buildNumber' => $buildNumber,
         ]);
+    }
+
+    /**
+     * Records a wrong-method allocation request and preserves the Allow header.
+     *
+     * @param string $projectId
+     * @return Response
+     */
+    public function createMethodError(string $projectId): Response
+    {
+        $id = filter_var($projectId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        return $this->createAllocationError('METHOD_NOT_ALLOWED', $id !== false && preg_match('/^[1-9][0-9]*$/D', $projectId) === 1 ? $id : null, headers: ['Allow' => 'POST']);
+    }
+
+    /**
+     * Records validated failure metadata when runtime storage is available, retaining the public error if storage fails.
+     *
+     * @param string $code
+     * @param ?int $projectId
+     * @param ?string $requestId
+     * @param ?\Ordinal\Model\AllocationCaller $caller
+     * @param array $headers
+     * @param ?string $reason
+     * @return Response
+     */
+    private function createAllocationError(
+        string                           $code,
+        ?int                             $projectId,
+        ?string                          $requestId = null,
+        ?\Ordinal\Model\AllocationCaller $caller    = null,
+        array                            $headers   = [],
+        ?string                          $reason    = null,
+    ): Response
+    {
+        if ($this->authorizer instanceof RuntimeAllocationAuthorizer) {
+            try { $this->authorizer->getAuditRepository()->recordAllocationFailure($projectId, $requestId, $caller, $code, $reason); }
+            catch (\Throwable) { \Ordinal\Http\OperationalLog::recordAuditFailure(); }
+        }
+        return ApiError::createResponse($code, $headers);
     }
 }

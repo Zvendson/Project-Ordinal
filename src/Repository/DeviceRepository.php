@@ -101,7 +101,9 @@ final readonly class DeviceRepository
         if ($credential === null || (int) $credential['user_id'] !== $userId || (int) $credential['project_id'] !== $projectId
             || $credential['revoked_at'] !== null || $credential['device_revoked_at'] !== null || $credential['is_expired']
             || ($credential['lifetime_days'] === 0 && $credential['provider_sign_in_at'] === null)) {
-            throw new AuthenticationException('Device authentication is required or invalid.');
+            $reason = ($credential['revoked_at'] ?? null) !== null || ($credential['device_revoked_at'] ?? null) !== null
+                ? 'CREDENTIAL_REVOKED' : (($credential['is_expired'] ?? false) ? 'CREDENTIAL_EXPIRED' : null);
+            throw new AuthenticationException('Device authentication is required or invalid.', reason: $reason);
         }
     }
 

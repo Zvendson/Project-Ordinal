@@ -11,6 +11,13 @@ use SensitiveParameter;
 abstract class AllocationAuthorizer
 {
     /**
+     * Supplies only locally verified caller identity for unsuccessful-attempt attribution.
+     *
+     * @return ?AllocationCaller
+     */
+    public function getVerifiedCaller(): ?AllocationCaller { return null; }
+
+    /**
      * Verifies the credential/current permission and returns stable verified caller IDs.
      *
      * @param int $projectId

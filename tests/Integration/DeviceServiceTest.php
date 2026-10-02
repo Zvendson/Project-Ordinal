@@ -358,14 +358,10 @@ final class DeviceServiceTest extends TestCase
         $this->application->devices->saveAuthenticationPolicy($session, $project, null, 0);
         $credential = $this->application->devices->enrollDevice($session, $project, 'Laptop');
         $this->connection->exec("ALTER TABLE audit_events ADD CONSTRAINT reject_allocation CHECK (action <> 'allocate_build_number')");
-        try {
-            $this->allocate($project, $credential['token'], 1);
-            self::fail('A failed audit committed allocation.');
-        } catch (\PDOException) {
-            self::assertNull($this->connection->query('SELECT consumed_allocation_id FROM device_credentials')->fetchColumn());
-            self::assertSame(0, (int) $this->connection->query('SELECT count(*) FROM allocations')->fetchColumn());
-            self::assertSame(1, (int) $this->connection->query('SELECT next_build_number FROM projects')->fetchColumn());
-        }
+        self::assertSame(500, $this->request($project, $credential['token'], 1)->statusCode);
+        self::assertNull($this->connection->query('SELECT consumed_allocation_id FROM device_credentials')->fetchColumn());
+        self::assertSame(0, (int) $this->connection->query('SELECT count(*) FROM allocations')->fetchColumn());
+        self::assertSame(1, (int) $this->connection->query('SELECT next_build_number FROM projects')->fetchColumn());
     }
 
     /**

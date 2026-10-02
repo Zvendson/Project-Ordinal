@@ -52,11 +52,17 @@ final readonly class AutomationRepository
      * @param string $secretHash
      * @return void
      */
-    public function requireActiveToken(?array $token, int $projectId, #[SensitiveParameter] string $secretHash): void
+    public function requireActiveToken(
+        ?array $token,
+        int    $projectId,
+        #[SensitiveParameter]
+        string $secretHash,
+    ): void
     {
         if ($token === null || (int) $token['project_id'] !== $projectId || $token['revoked_at'] !== null || $token['is_expired']
             || !hash_equals($token['secret_hash'], $secretHash)) {
-            throw new AuthenticationException('Automation authentication is required or invalid.');
+            $reason = ($token['revoked_at'] ?? null) !== null ? 'CREDENTIAL_REVOKED' : (($token['is_expired'] ?? false) ? 'CREDENTIAL_EXPIRED' : null);
+            throw new AuthenticationException('Automation authentication is required or invalid.', reason: $reason);
         }
     }
 
@@ -70,7 +76,14 @@ final readonly class AutomationRepository
      * @param ?int $lifetimeDays
      * @return array
      */
-    public function createToken(int $projectId, int $actorId, string $name, #[SensitiveParameter] string $hash, ?int $lifetimeDays): array
+    public function createToken(
+        int    $projectId,
+        int    $actorId,
+        string $name,
+        #[SensitiveParameter]
+        string $hash,
+        ?int   $lifetimeDays,
+    ): array
     {
         $statement = $this->connection->prepare('INSERT INTO automation_tokens (project_id, created_by_user_id, name, secret_hash, created_at, expires_at)
             VALUES (:project, :actor, :name, :hash, statement_timestamp(), CASE WHEN CAST(:days AS INTEGER) IS NULL THEN NULL ELSE statement_timestamp() + make_interval(days => CAST(:length AS INTEGER)) END) RETURNING *');
@@ -86,7 +99,12 @@ final readonly class AutomationRepository
      * @param ?int $lifetimeDays
      * @return array
      */
-    public function rotateToken(int $id, #[SensitiveParameter] string $hash, ?int $lifetimeDays): array
+    public function rotateToken(
+        int    $id,
+        #[SensitiveParameter]
+        string $hash,
+        ?int   $lifetimeDays,
+    ): array
     {
         $statement = $this->connection->prepare('UPDATE automation_tokens SET secret_hash = :hash, rotated_at = statement_timestamp(),
             expires_at = CASE WHEN CAST(:days AS INTEGER) IS NULL THEN NULL ELSE statement_timestamp() + make_interval(days => CAST(:length AS INTEGER)) END WHERE id = :id RETURNING *');

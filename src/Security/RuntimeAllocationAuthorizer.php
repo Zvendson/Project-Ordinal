@@ -14,6 +14,29 @@ use SensitiveParameter;
 /** Lazily wires protected allocation after request validation, using one transaction connection. */
 final class RuntimeAllocationAuthorizer extends AllocationAuthorizer
 {
+    /** Prevents earlier request context in injected services from attributing an unchecked request. */
+    private bool $hasCheckedCaller = false;
+
+    /**
+     * Returns only this request's locally verified identity.
+     *
+     * @return ?AllocationCaller
+     */
+    public function getVerifiedCaller(): ?AllocationCaller
+    {
+        return $this->hasCheckedCaller ? $this->application?->allocationAuthorizer->getVerifiedCaller() : null;
+    }
+
+    /**
+     * Opens audit storage even for input/transport rejection, without examining rejected credentials.
+     *
+     * @return \Ordinal\Repository\AuditRepository
+     */
+    public function getAuditRepository(): \Ordinal\Repository\AuditRepository
+    {
+        $this->application ??= AccountApplication::createFromEnvironment();
+        return $this->application->audit;
+    }
     /**
      * Accepts trusted transport context and optional request-scoped services.
      *
@@ -34,8 +57,13 @@ final class RuntimeAllocationAuthorizer extends AllocationAuthorizer
      * @param ?string $bearerToken
      * @return AllocationCaller
      */
-    public function authorizeAllocation(int $projectId, #[SensitiveParameter] ?string $bearerToken): AllocationCaller
+    public function authorizeAllocation(
+        int     $projectId,
+        #[SensitiveParameter]
+        ?string $bearerToken,
+    ): AllocationCaller
     {
+        $this->hasCheckedCaller = false;
         if (!$this->isSecure) {
             throw new AuthenticationException('Allocation requires HTTPS.');
         }
@@ -44,6 +72,7 @@ final class RuntimeAllocationAuthorizer extends AllocationAuthorizer
         } catch (InvalidArgumentException) {
             throw new AllocationException(AllocationException::PROVIDER_UNAVAILABLE);
         }
+        $this->hasCheckedCaller = true;
         return $this->application->allocationAuthorizer->authorizeAllocation($projectId, $bearerToken);
     }
 
