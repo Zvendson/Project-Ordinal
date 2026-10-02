@@ -6,7 +6,7 @@ The idea is to keep the numbers in one place. If two builds start at the same ti
 
 I am building this step by step, starting with teh backend. The frontend comes later and should stay simple. The website will use HTML, CSS, TypeScript, PHP and PostgreSQL, with GitHub and GitLab for sign in and repository access.
 
-The backend can now sign in through GitHub and GitLab, link repositories to projects and allocate build numbers. Retrying the same request returns its original number. There are simple account and administration pages, without CSS yet.
+The backend can now sign in through GitHub and GitLab, link repositories to projects and allocate build numbers. Retrying the same request returns its original number. There are simple account and administration pages with shared navigation and styles for smaller screens too.
 
 Devices can get their own project credentials. The secret is shown once and only its hash is stored. Lifetimes can be positive days, 0 for one allocation, or -1 without expiration. Credentials and whole devices can be revoked. Developer requests still check repository write access, including retries.
 
@@ -18,7 +18,21 @@ Administrators can check the next number without using it, edit the counter and 
 
 There are project and instance audit pages too. Instance administrators can preview and confirm deletion of old logs. Its only the logs that get removed, counters and permanent retries stay there. Projects can be archived and reactivated without losing their records.
 
-The backend tests and a PostgreSQL backup restore have passed locally. The frontend comes next. Provider tests use mocked responses, so live GitHub and GitLab verification is still open. The CI examples have not been run on live runners yet. Apache, Nginx and deployed HTTPS still need to be checked on the actual server.
+The backend tests and a PostgreSQL backup restore have passed locally. The simple frontend is there now too. Provider tests use mocked responses, so live GitHub and GitLab verification is still open. The CI examples have not been run on live runners yet. Apache, Nginx and deployed HTTPS still need to be checked on the actual server.
+
+## Frontend assets
+
+Each PHP widget has its own CSS module. Shared styles keep forms and navigation consistent. TypeScript adds an inline next-number preview, a copy button for new secrets and feedback while forms are submitted. Normal forms and manual secret copying still work without JavaScript.
+
+Build the assets before deploying. Node and npm are only needed on the build machine, the running website serves the compiled files from public/assets:
+
+```sh
+npm ci --ignore-scripts
+npm test
+npm run build
+```
+
+The build uses TypeScript 7.0.2 and PHP to combine the styles. Keep the compiled release files with the deployment. Its still the backend that checks permissions, CSRF and reset confirmations.
 
 ## Running the website
 
