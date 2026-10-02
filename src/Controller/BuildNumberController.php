@@ -17,12 +17,11 @@ use Ordinal\Service\AllocationException;
 use Ordinal\Service\BuildNumberService;
 use SensitiveParameter;
 use stdClass;
+use Ordinal\Model\RequestId;
 
 /** Validates allocation requests and enforces their authorization boundary. */
 final class BuildNumberController
 {
-    /** Matches UUID v4 with the standard RFC variant bits. */
-    private const string REQUEST_ID_PATTERN = '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iD';
     /** Matches a Bearer token without accepting other authentication schemes. */
     private const string BEARER_PATTERN = '/^Bearer ([A-Za-z0-9\-._~+\/]+=*)$/iD';
 
@@ -69,7 +68,7 @@ final class BuildNumberController
         }
 
         if (!$request instanceof stdClass || !isset($request->requestId) || !is_string($request->requestId)
-            || preg_match(self::REQUEST_ID_PATTERN, $request->requestId) !== 1) {
+            || !RequestId::isValid($request->requestId)) {
             return ApiError::createResponse('INVALID_REQUEST');
         }
 
