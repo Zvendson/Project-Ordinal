@@ -10,6 +10,21 @@ use Throwable;
 final class TemplateRenderer
 {
     /**
+     * Renders a fixed account template; request input cannot select a file path.
+     *
+     * @param string $page
+     * @param array $data
+     * @return string
+     */
+    public function renderAccountPage(string $page, array $data): string
+    {
+        $templates = ['login' => 'login.php', 'account' => 'account.php', 'administration' => 'administration.php', 'projects' => 'projects.php', 'project' => 'project.php'];
+        if (!isset($templates[$page])) {
+            throw new \InvalidArgumentException('Unknown account template.');
+        }
+        return $this->renderTemplate($templates[$page], $data);
+    }
+    /**
      * Renders the initial unstyled home page.
      *
      * @return string
