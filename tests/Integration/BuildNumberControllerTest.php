@@ -93,7 +93,21 @@ final class BuildNumberControllerTest extends TestCase
         self::assertTrue($this->connection->query('SELECT has_allocated_build_number FROM projects WHERE id = 1')->fetchColumn());
     }
 
-
+    /**
+     * Returns numeric uint32 maximum, then maps exhaustion to the agreed 409 code.
+     *
+     * @return void
+     */
+    public function testMapsExhaustionAndPreservesMaximum(): void
+    {
+        $this->connection->exec('UPDATE projects SET next_build_number = 4294967295 WHERE id = 1');
+        $first = $this->submitRequest(self::FIRST_REQUEST);
+        self::assertSame(4294967295, json_decode($first->body, true, flags: JSON_THROW_ON_ERROR)['buildNumber']);
+        $response = $this->submitRequest(self::SECOND_REQUEST);
+        self::assertSame(409, $response->statusCode);
+        self::assertSame('BUILD_COUNTER_EXHAUSTED', json_decode($response->body, true, flags: JSON_THROW_ON_ERROR)['error']['code']);
+        self::assertSame($first->body, $this->submitRequest(self::FIRST_REQUEST)->body);
+    }
 
     /**
      * Maps a verified request for a missing project to the agreed 404 error.
