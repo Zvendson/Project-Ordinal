@@ -10,7 +10,9 @@ use Ordinal\View\TemplateRenderer;
 <h2><?= $data['isHistory'] ? 'Build history' : 'Audit logs' ?><?= $data['project'] === null ? '' : ': ' . TemplateRenderer::escape($data['project']['name']) ?></h2>
 <p>Times are shown in UTC. Events are listed newest first, up to <?= AuditRepository::PAGE_SIZE ?> per page.</p>
 <?php if ($data['events'] === []): ?><p>No visible events.</p><?php else: ?>
+<div class="table-scroll" role="region" aria-label="<?= $data['isHistory'] ? 'Build history' : 'Audit logs' ?> table" tabindex="0">
 <table>
+    <caption><?= $data['isHistory'] ? 'Build history' : 'Audit events' ?>, newest first. All times UTC.</caption>
     <thead><tr><th>Time (UTC)</th><th>Project</th><th>Caller</th><th>Action</th><th>Outcome</th><th>Build number</th><th>Request ID</th><?php if (!$data['isHistory']): ?><th>Details</th><?php endif; ?></tr></thead>
     <tbody>
     <?php foreach ($data['events'] as $event): ?>
@@ -30,6 +32,7 @@ use Ordinal\View\TemplateRenderer;
     <?php endforeach; ?>
     </tbody>
 </table>
+</div>
 <?php if (count($data['events']) === AuditRepository::PAGE_SIZE): ?><p><a href="<?= TemplateRenderer::escape($data['pagePath']) ?>?beforeId=<?= (int) $data['events'][array_key_last($data['events'])]['id'] ?>">Older events</a></p><?php endif; ?>
 <?php endif; ?>
 <?php if ($data['project'] === null): ?><p><a href="/logs/cleanup">Delete old logs</a> · <a href="/administration">Administration</a></p>

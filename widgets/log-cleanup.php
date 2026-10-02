@@ -12,7 +12,7 @@ use Ordinal\View\TemplateRenderer;
     <button type="submit">Preview deletion</button>
 </form>
 <p><?= (int) $data['count'] ?> entries are currently older than <?= TemplateRenderer::escape($data['cutoff']) ?>. The actual count may change before confirmation.</p>
-<p>Deletion removes log and build-history entries. It preserves counters, permanent request IDs, allocations and referenced identities. This action cannot be undone from the website.</p>
+<p class="warning">Deletion removes log and build-history entries. It preserves counters, permanent request IDs, allocations and referenced identities. This action cannot be undone from the website.</p>
 <form method="post" action="/logs/cleanup">
     <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($data['session']->csrfToken) ?>">
     <input type="hidden" name="beforeDate" value="<?= TemplateRenderer::escape($data['beforeDate']) ?>">

@@ -27,6 +27,32 @@ final class ProjectControllerTest extends TestCase
      */
     protected function tearDown(): void { $this->fixture->close(); }
 
+    /** Shared navigation uses the verified local role on history, controls and credential receipts. @return void */
+    public function testKeepsNavigationConsistentWithCurrentAccount(): void
+    {
+        $app = $this->fixture->application;
+        $secret = $this->fixture->signIn();
+        $session = $app->sessions->authenticate($secret);
+        $project = $app->projects->createProject($session, 1, '77', 'Project');
+        $router = new Router($app);
+        $cookies = [BrowserSessionService::COOKIE_NAME => $secret];
+        foreach (['/projects/' . $project . '/counter', '/projects/' . $project . '/history', '/devices', '/administration'] as $path) {
+            $page = $router->dispatch('GET', $path, cookies: $cookies, isSecure: true);
+            self::assertSame(200, $page->statusCode);
+            self::assertStringContainsString('href="/administration"', $page->body);
+            self::assertStringNotContainsString('href="/login"', $page->body);
+        }
+        $receipt = $router->dispatch('POST', '/devices/enroll', http_build_query(['csrfToken' => $session->csrfToken, 'projectId' => $project, 'name' => 'Laptop']), contentType: 'application/x-www-form-urlencoded', cookies: $cookies, isSecure: true);
+        self::assertSame(200, $receipt->statusCode);
+        self::assertSame('no-store', $receipt->headers['Cache-Control']);
+        self::assertStringContainsString('href="/administration"', $receipt->body);
+        $cookies = [BrowserSessionService::COOKIE_NAME => $this->fixture->signIn('9')];
+        $page = $router->dispatch('GET', '/projects/' . $project . '/history', cookies: $cookies, isSecure: true);
+        self::assertSame(200, $page->statusCode);
+        self::assertStringNotContainsString('href="/administration"', $page->body);
+        self::assertStringNotContainsString('href="/login"', $page->body);
+    }
+
     /**
      * Requires HTTPS and browser administration, returns the specified JSON and never consumes a number.
      *

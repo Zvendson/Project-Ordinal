@@ -400,7 +400,7 @@ final class AccountController
             default => $this->application->history->getInstanceLogs($session, $beforeId),
         };
         $isHistory = $action === 'showHistory';
-        return $this->renderPage('events', $data + ['isHistory' => $isHistory, 'pagePath' => $id === null ? '/logs' : '/projects/' . $id . ($isHistory ? '/history' : '/logs')]);
+        return $this->renderPage('events', $data + ['session' => $session, 'isHistory' => $isHistory, 'pagePath' => $id === null ? '/logs' : '/projects/' . $id . ($isHistory ? '/history' : '/logs')]);
     }
 
     /**
@@ -491,7 +491,7 @@ final class AccountController
         $session = $this->getFormSession($fields, $cookies);
         $deviceId = ($fields['deviceId'] ?? '') === '' ? null : $this->getPositiveInteger($fields, 'deviceId');
         $name = $deviceId === null ? $this->getString($fields, 'name') : '';
-        return $this->renderPage('device-credential', $this->application->devices->enrollDevice($session, $this->getPositiveInteger($fields, 'projectId'), $name, $deviceId));
+        return $this->renderPage('device-credential', $this->application->devices->enrollDevice($session, $this->getPositiveInteger($fields, 'projectId'), $name, $deviceId) + ['session' => $session]);
     }
 
     /**
@@ -586,9 +586,9 @@ final class AccountController
         $projectId = $this->getPositiveInteger($fields, 'projectId');
         switch ($this->getString($fields, 'action')) {
             case 'create':
-                return $this->renderPage('automation-secret', $this->application->automation->createToken($session, $projectId, $this->getString($fields, 'name'), $this->getBoolean($fields, 'hasNoExpiration')));
+                return $this->renderPage('automation-secret', $this->application->automation->createToken($session, $projectId, $this->getString($fields, 'name'), $this->getBoolean($fields, 'hasNoExpiration')) + ['session' => $session]);
             case 'rotate':
-                return $this->renderPage('automation-secret', $this->application->automation->rotateToken($session, $this->getPositiveInteger($fields, 'tokenId'), $this->getBoolean($fields, 'hasNoExpiration')));
+                return $this->renderPage('automation-secret', $this->application->automation->rotateToken($session, $this->getPositiveInteger($fields, 'tokenId'), $this->getBoolean($fields, 'hasNoExpiration')) + ['session' => $session]);
             case 'rename':
                 $this->application->automation->renameToken($session, $this->getPositiveInteger($fields, 'tokenId'), $this->getString($fields, 'name'));
                 break;
@@ -767,7 +767,7 @@ final class AccountController
     }
 
     /**
-     * Renders one fixed private account template with escaped dynamic values.
+     * Supplies current instance navigation access and renders a fixed private account template.
      *
      * @param string $page
      * @param array $data
@@ -779,6 +779,9 @@ final class AccountController
         array  $data,
     ): Response
     {
+        if (isset($data['session'])) {
+            $data['isAdministrator'] = $this->application->administration->isInstanceAdministrator($data['session']->userId);
+        }
         return Response::createHtml((new TemplateRenderer())->renderAccountPage($page, $data), headers: ['Referrer-Policy' => 'no-referrer']);
     }
 

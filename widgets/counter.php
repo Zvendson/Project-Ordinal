@@ -9,9 +9,10 @@ use Ordinal\View\TemplateRenderer;
 <h2>Counter: <?= TemplateRenderer::escape($data['project']['name']) ?></h2>
 <p>Next build number: <?= (int) $data['preview']['nextBuildNumber'] ?>. Exhausted: <?= $data['preview']['isExhausted'] ? 'yes' : 'no' ?>.</p>
 <p>A preview does not reserve a number. Another build may allocate it before your build starts.</p>
-<form method="get" action="/api/projects/<?= (int) $data['project']['id'] ?>/build-numbers/next">
+<form method="get" action="/api/projects/<?= (int) $data['project']['id'] ?>/build-numbers/next" data-counter-preview data-project-id="<?= (int) $data['project']['id'] ?>">
     <button type="submit">Check next build number</button>
 </form>
+<p role="status" data-preview-status></p>
 <h3>Edit the next number</h3>
 <p>Before the first allocation, any whole number in the range is allowed. Afterward, ordinary edits must increase the next number.</p>
 <form method="post" action="/projects/<?= (int) $data['project']['id'] ?>/counter">
@@ -21,7 +22,7 @@ use Ordinal\View\TemplateRenderer;
     <button type="submit">Save counter edit</button>
 </form>
 <h3>Hard reset</h3>
-<p>Warning: a hard reset can reuse previously allocated numbers. History and original request IDs will remain. Retrying an earlier request still returns its original number.</p>
+<p class="warning">Warning: a hard reset can reuse previously allocated numbers. History and original request IDs will remain. Retrying an earlier request still returns its original number.</p>
 <p>Sign in through the provider again within five minutes before confirming. <a href="/account">Go to account reauthentication</a>.</p>
 <form method="post" action="/projects/<?= (int) $data['project']['id'] ?>/counter">
     <input type="hidden" name="csrfToken" value="<?= TemplateRenderer::escape($data['session']->csrfToken) ?>">
