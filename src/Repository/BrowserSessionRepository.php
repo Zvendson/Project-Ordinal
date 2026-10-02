@@ -28,7 +28,13 @@ final readonly class BrowserSessionRepository
      * @param string $csrfToken
      * @return void
      */
-    public function createSession(int $userId, #[SensitiveParameter] string $secretHash, #[SensitiveParameter] string $csrfToken): void
+    public function createSession(
+        int    $userId,
+        #[SensitiveParameter]
+        string $secretHash,
+        #[SensitiveParameter]
+        string $csrfToken,
+    ): void
     {
         $statement = $this->connection->prepare("INSERT INTO browser_sessions (user_id, secret_hash, csrf_token, idle_minutes, absolute_minutes, expires_at, provider_reauthenticated_at) SELECT :user, :secret, :csrf, browser_idle_minutes, browser_absolute_minutes, clock_timestamp() + make_interval(mins => browser_absolute_minutes), clock_timestamp() FROM instance_settings WHERE id = 1");
         $statement->execute(['user' => $userId, 'secret' => $secretHash, 'csrf' => $csrfToken]);
@@ -40,7 +46,10 @@ final readonly class BrowserSessionRepository
      * @param string $secretHash
      * @return ?array
      */
-    public function authenticate(#[SensitiveParameter] string $secretHash): ?array
+    public function authenticate(
+        #[SensitiveParameter]
+        string $secretHash,
+    ): ?array
     {
         $statement = $this->connection->prepare("UPDATE browser_sessions s SET last_activity_at = clock_timestamp() FROM users u, provider_connections p, provider_authorizations a WHERE s.secret_hash = :secret AND u.id = s.user_id AND p.id = u.provider_connection_id AND a.user_id = u.id AND s.revoked_at IS NULL AND p.disabled_at IS NULL AND a.revoked_at IS NULL AND s.expires_at > clock_timestamp() AND s.last_activity_at + make_interval(mins => s.idle_minutes) > clock_timestamp() RETURNING s.*, u.provider_connection_id, u.provider_user_id, u.display_name");
         $statement->execute(['secret' => $secretHash]);
@@ -71,7 +80,8 @@ final readonly class BrowserSessionRepository
      */
     public function revokeSession(int $id): void
     {
-        $statement = $this->connection->prepare('UPDATE browser_sessions SET revoked_at = clock_timestamp() WHERE id = :id AND revoked_at IS NULL');
+        $statement = $this->connection->prepare("WITH revoked AS (UPDATE browser_sessions SET revoked_at = clock_timestamp() WHERE id = :id AND revoked_at IS NULL RETURNING user_id)
+            INSERT INTO audit_events (user_id, action, outcome) SELECT user_id, 'browser_logout', 'success' FROM revoked");
         $statement->execute(['id' => $id]);
     }
 
@@ -83,7 +93,13 @@ final readonly class BrowserSessionRepository
      * @param string $csrfToken
      * @return void
      */
-    public function reauthenticateSession(int $id, #[SensitiveParameter] string $secretHash, #[SensitiveParameter] string $csrfToken): void
+    public function reauthenticateSession(
+        int    $id,
+        #[SensitiveParameter]
+        string $secretHash,
+        #[SensitiveParameter]
+        string $csrfToken,
+    ): void
     {
         $statement = $this->connection->prepare('UPDATE browser_sessions SET secret_hash = :secret, csrf_token = :csrf, provider_reauthenticated_at = clock_timestamp(), last_activity_at = clock_timestamp() WHERE id = :id AND revoked_at IS NULL');
         $statement->execute(['id' => $id, 'secret' => $secretHash, 'csrf' => $csrfToken]);

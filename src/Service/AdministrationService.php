@@ -16,8 +16,6 @@ use PDO;
 /** Protects bootstrap/last administration and serializes instance policy mutations. */
 final readonly class AdministrationService
 {
-    /** Limits sensitive administrator changes to a recent provider sign-in. */
-    private const int REAUTHENTICATION_SECONDS = 300;
     /** Matches PostgreSQL's positive INTEGER range for session-minute settings. */
     private const int MAX_MINUTES = 2_147_483_647;
 
@@ -235,9 +233,8 @@ final readonly class AdministrationService
                 $this->repository->lockSettings();
                 $current = $this->sessions->requireActiveSession($session, true);
                 $this->requireInstanceAdministrator($current);
-                $reauthenticatedAt = $current->providerReauthenticatedAt?->getTimestamp();
-                if ($requiresReauthentication && ($reauthenticatedAt === null || $reauthenticatedAt > time() || $reauthenticatedAt < time() - self::REAUTHENTICATION_SECONDS)) {
-                    throw new AccountException('Sign in again before changing administrator access.');
+                if ($requiresReauthentication) {
+                    $this->sessions->requireRecentProviderAuthentication($current);
                 }
                 $operation($current);
             },

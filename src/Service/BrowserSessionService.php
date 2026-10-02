@@ -17,6 +17,8 @@ final readonly class BrowserSessionService
     public const string COOKIE_NAME = '__Host-ordinal-session';
     /** Provides 256 bits of randomness for session and CSRF credentials. */
     public const int SECRET_BYTES = 32;
+    /** Bounds provider sign-in freshness for sensitive administrative changes. */
+    private const int REAUTHENTICATION_SECONDS = 300;
 
     /**
      * Uses the session repository for expiration/revocation checks.
@@ -48,7 +50,10 @@ final readonly class BrowserSessionService
      * @return BrowserSession
      * @throws AuthenticationException
      */
-    public function authenticate(#[SensitiveParameter] string $secret): BrowserSession
+    public function authenticate(
+        #[SensitiveParameter]
+        string $secret,
+    ): BrowserSession
     {
         if (preg_match('/^[a-f0-9]{64}$/D', $secret) !== 1) {
             throw new AuthenticationException('Authentication is required or invalid.');
@@ -85,7 +90,11 @@ final readonly class BrowserSessionService
      * @return void
      * @throws AccountException
      */
-    public function requireCsrfToken(BrowserSession $session, #[SensitiveParameter] mixed $submittedToken): void
+    public function requireCsrfToken(
+        BrowserSession $session,
+        #[SensitiveParameter]
+        mixed          $submittedToken,
+    ): void
     {
         $session = $this->requireActiveSession($session);
         if (!is_string($submittedToken) || !hash_equals($session->csrfToken, $submittedToken)) {
@@ -103,6 +112,22 @@ final readonly class BrowserSessionService
     {
         $this->requireActiveSession($session);
         $this->repository->revokeSession($session->id);
+    }
+
+    /**
+     * Requires the persisted provider sign-in to be within five minutes, excluding refresh/activity.
+     *
+     * @param BrowserSession $session
+     * @return void
+     */
+    public function requireRecentProviderAuthentication(BrowserSession $session): void
+    {
+        $current = $this->requireActiveSession($session);
+        $at = $current->providerReauthenticatedAt?->getTimestamp();
+        $now = time();
+        if ($at === null || $at > $now || $at < $now - self::REAUTHENTICATION_SECONDS) {
+            throw new AccountException('Sign in again before performing this sensitive action.');
+        }
     }
 
     /**
@@ -125,7 +150,10 @@ final readonly class BrowserSessionService
      * @param string $secret
      * @return string
      */
-    public static function createCookie(#[SensitiveParameter] string $secret): string
+    public static function createCookie(
+        #[SensitiveParameter]
+        string $secret,
+    ): string
     {
         return self::COOKIE_NAME . '=' . $secret . '; Path=/; Secure; HttpOnly; SameSite=Lax';
     }
@@ -146,7 +174,10 @@ final readonly class BrowserSessionService
      * @param array $row
      * @return BrowserSession
      */
-    private function createSessionModel(#[SensitiveParameter] array $row): BrowserSession
+    private function createSessionModel(
+        #[SensitiveParameter]
+        array $row,
+    ): BrowserSession
     {
         return new BrowserSession((int) $row['id'], (int) $row['user_id'], (int) $row['provider_connection_id'], $row['provider_user_id'], $row['display_name'], $row['csrf_token'],
             $row['provider_reauthenticated_at'] === null ? null : new DateTimeImmutable($row['provider_reauthenticated_at']), new DateTimeImmutable($row['expires_at']));
