@@ -6,4 +6,4 @@ declare(strict_types=1);
 
 use Ordinal\Controller\HomeController;
 
-return (new HomeController())->showHome();
+return (new HomeController($this->managementApplication))->showHome($cookies, $isSecure);

@@ -36,6 +36,50 @@ final class ManagementControllerTest extends TestCase
     protected function tearDown(): void { $this->fixture->close(); }
 
     /**
+     * Keeps the home navigation consistent with the current administrator session.
+     *
+     * @return void
+     */
+    public function testShowsAuthenticatedHomeNavigation(): void
+    {
+        $cookie = $this->fixture->signIn();
+        $cookies = [SessionService::COOKIE_NAME => $cookie];
+        $response = $this->router->dispatch('GET', '/', cookies: $cookies, isSecure: true);
+        self::assertSame(200, $response->statusCode);
+        self::assertStringContainsString('Sign out', $response->body);
+        self::assertStringContainsString('Audit logs', $response->body);
+        self::assertStringNotContainsString('Sign in', $response->body);
+        self::assertStringContainsString('no-store', $response->headers['Cache-Control']);
+
+        $session = $this->fixture->application->administrator->authenticateSession($cookie);
+        self::assertStringContainsString($session->csrfToken, $response->body);
+        $this->fixture->application->administrator->signOut($session);
+        $signedOut = $this->router->dispatch('GET', '/', cookies: $cookies, isSecure: true);
+        self::assertSame(200, $signedOut->statusCode);
+        self::assertStringContainsString('Sign in', $signedOut->body);
+        self::assertStringNotContainsString('Sign out', $signedOut->body);
+    }
+
+    /**
+     * Leaves the public home available without a session and ignores insecure cookies.
+     *
+     * @return void
+     */
+    public function testShowsAnonymousHomeNavigation(): void
+    {
+        $cookie = $this->fixture->signIn();
+        foreach ([[], [SessionService::COOKIE_NAME => 'invalid'], [SessionService::COOKIE_NAME => $cookie]] as $cookies) {
+            $response = $this->router->dispatch('GET', '/', cookies: $cookies);
+            self::assertSame(200, $response->statusCode);
+            self::assertStringContainsString('Sign in', $response->body);
+            self::assertStringNotContainsString('Sign out', $response->body);
+        }
+        $response = $this->router->dispatch('GET', '/', cookies: [SessionService::COOKIE_NAME => 'invalid'], isSecure: true);
+        self::assertSame(200, $response->statusCode);
+        self::assertStringContainsString('Sign in', $response->body);
+    }
+
+    /**
      * Protects management and requires actual HTTPS, with removed routes returning 404.
      *
      * @return void

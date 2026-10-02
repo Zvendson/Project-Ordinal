@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Ordinal\View;
 
+use Ordinal\Model\AdministratorSession;
 use Throwable;
 use SensitiveParameter;
 
@@ -32,11 +33,12 @@ final class TemplateRenderer
     /**
      * Renders the home page through the shared accessible shell.
      *
+     * @param ?AdministratorSession $session
      * @return string
      */
-    public function renderHome(): string
+    public function renderHome(?AdministratorSession $session = null): string
     {
-        return $this->renderTemplate('home.php', []);
+        return $this->renderTemplate('home.php', ['session' => $session]);
     }
 
     /**
