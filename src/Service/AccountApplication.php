@@ -28,25 +28,31 @@ use SensitiveParameter;
 final readonly class AccountApplication
 {
     /** Resolves allowed concrete provider integrations. */
-    public ProviderRegistry            $providers;
+    public ProviderRegistry                    $providers;
     /** Coordinates encrypted reusable credentials. */
-    public AuthorizationService        $authorizations;
+    public AuthorizationService                $authorizations;
     /** Manages opaque server-side browser sessions. */
-    public BrowserSessionService       $sessions;
+    public BrowserSessionService               $sessions;
     /** Coordinates state/PKCE callbacks. */
-    public LoginService                $login;
+    public LoginService                        $login;
     /** Protects instance grants and connection/session configuration. */
-    public AdministrationService       $administration;
+    public AdministrationService               $administration;
     /** Links immutable repositories and checks current project roles. */
-    public ProjectService              $projects;
+    public ProjectService                      $projects;
     /** Manages provider-approved project credentials and revocation. */
-    public DeviceService               $devices;
+    public DeviceService                       $devices;
     /** Verifies local CI tokens or device credentials with live repository write permission. */
-    public ProjectAllocationAuthorizer $allocationAuthorizer;
+    public ProjectAllocationAuthorizer         $allocationAuthorizer;
     /** Manages named project-scoped automation tokens and current policy. */
-    public AutomationService           $automation;
+    public AutomationService                   $automation;
     /** Allocates and consumes single-use credentials atomically. */
-    public BuildNumberService          $buildNumbers;
+    public BuildNumberService                  $buildNumbers;
+    /** Serializes counter, visibility, and archive controls with allocations. */
+    public ProjectAdministrationService        $projectAdministration;
+    /** Restricts deletable history/log views and confirmed cleanup. */
+    public HistoryService                      $history;
+    /** Records unsuccessful allocation attempts without secret-bearing request data. */
+    public \Ordinal\Repository\AuditRepository $audit;
 
     /**
      * Wires domain repositories and services using one request-scoped database connection.
@@ -81,6 +87,9 @@ final readonly class AccountApplication
         $this->automation = new AutomationService($connection, $automationRepository, new ProjectRepository($connection), $this->projects, $this->sessions, $this->administration, $administrationRepository);
         $this->allocationAuthorizer = new ProjectAllocationAuthorizer($deviceRepository, $access, $automationRepository);
         $this->buildNumbers = new BuildNumberService($connection);
+        $this->audit = new \Ordinal\Repository\AuditRepository($connection);
+        $this->projectAdministration = new ProjectAdministrationService($connection, new ProjectRepository($connection), $this->projects, $this->sessions, $this->administration, $this->audit);
+        $this->history = new HistoryService($this->audit, new ProjectRepository($connection), $this->projects, $this->administration);
     }
 
     /**
