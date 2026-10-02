@@ -47,7 +47,7 @@ final class BuildNumberCommandTest extends TestCase
     {
         $projectRoot = dirname(__DIR__, 3);
         $directory = $projectRoot . '/.local/standalone_command_test_' . bin2hex(random_bytes(8));
-        $paths = ['bin/request-build-number.php', 'integrations/autoload.php', 'src/Integration/BuildNumberClient.php', 'src/Integration/BuildRequestStore.php', 'src/Integration/BuildIntegrationException.php', 'src/Integration/BuildTransportException.php', 'src/Integration/BuildNumberTransport.php', 'src/Integration/CurlBuildNumberTransport.php', 'src/Model/RequestId.php', 'src/Model/ProviderConfiguration.php', 'src/Http/HttpResponse.php'];
+        $paths = ['bin/request-build-number.php', 'integrations/autoload.php', 'src/Integration/BuildNumberClient.php', 'src/Integration/BuildRequestStore.php', 'src/Integration/BuildIntegrationException.php', 'src/Integration/BuildTransportException.php', 'src/Integration/BuildNumberTransport.php', 'src/Integration/CurlBuildNumberTransport.php', 'src/Model/RequestId.php', 'src/Http/SecureUrl.php', 'src/Http/HttpResponse.php'];
         $directories = [];
         try {
             foreach ($paths as $path) {

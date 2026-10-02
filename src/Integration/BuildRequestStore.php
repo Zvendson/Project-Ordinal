@@ -6,7 +6,7 @@ namespace Ordinal\Integration;
 
 use InvalidArgumentException;
 use JsonException;
-use Ordinal\Model\ProviderConfiguration;
+use Ordinal\Http\SecureUrl;
 use Ordinal\Model\RequestId;
 
 /** Durably saves one request identity before any network operation, scoped to instance/project/build attempt. */
@@ -38,7 +38,7 @@ final readonly class BuildRequestStore
     public static function normalizeServerUrl(string $serverUrl): string
     {
         try {
-            ProviderConfiguration::assertSecureUrl($serverUrl);
+            SecureUrl::assertSecureUrl($serverUrl);
         } catch (InvalidArgumentException) {
             throw new BuildIntegrationException('Use an HTTPS instance URL without embedded credentials, query, or fragment.');
         }
