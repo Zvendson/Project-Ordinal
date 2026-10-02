@@ -174,6 +174,58 @@ final class ApplicationSchemaTest extends TestCase
     }
 
     /**
+     * Starts new projects at one without allocation or exhaustion state.
+     *
+     * @return void
+     */
+    public function testInitializesProjectCounter(): void
+    {
+        $this->createProjectFixtures();
+        $counter = $this->connection->query('SELECT next_build_number, has_allocated_build_number, is_exhausted FROM projects WHERE id = 1')->fetch();
+        self::assertSame(['next_build_number' => 1, 'has_allocated_build_number' => false, 'is_exhausted' => false], $counter);
+        $types = $this->connection->query("SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND ((table_name = 'projects' AND column_name = 'next_build_number') OR (table_name = 'allocations' AND column_name = 'build_number')) ORDER BY table_name")->fetchAll(PDO::FETCH_COLUMN);
+        self::assertSame(['bigint', 'bigint'], $types);
+    }
+
+    /**
+     * Stores both uint32 endpoints and rejects values outside that range.
+     *
+     * @return void
+     */
+    public function testEnforcesBuildNumberBounds(): void
+    {
+        $this->createProjectFixtures();
+        foreach ([0, 4294967295] as $buildNumber) {
+            $this->connection->exec('UPDATE projects SET next_build_number = ' . $buildNumber . ' WHERE id = 1');
+            self::assertSame($buildNumber, $this->connection->query('SELECT next_build_number FROM projects WHERE id = 1')->fetchColumn());
+        }
+        $this->connection->exec("INSERT INTO allocations (project_id, request_id, build_number, caller_kind) VALUES (1, '11111111-1111-4111-8111-111111111111', 0, 'anonymous'), (1, '22222222-2222-4222-8222-222222222222', 4294967295, 'anonymous')");
+        self::assertSame([0, 4294967295], $this->connection->query('SELECT build_number FROM allocations ORDER BY id')->fetchAll(PDO::FETCH_COLUMN));
+        foreach ([-1, 4294967296] as $buildNumber) {
+            $this->assertRejectsSql('UPDATE projects SET next_build_number = ' . $buildNumber . ' WHERE id = 1', '23514');
+            $this->assertRejectsSql("INSERT INTO allocations (project_id, request_id, build_number, caller_kind) VALUES (1, '33333333-3333-4333-8333-333333333333', " . $buildNumber . ", 'anonymous')", '23514');
+        }
+    }
+
+    /**
+     * Requires exhaustion to retain the maximum number and an allocation history flag.
+     *
+     * @return void
+     */
+    public function testEnforcesExhaustionState(): void
+    {
+        $this->createProjectFixtures();
+        $this->assertRejectsSql('UPDATE projects SET is_exhausted = TRUE WHERE id = 1', '23514');
+        $this->connection->exec('UPDATE projects SET next_build_number = 4294967295 WHERE id = 1');
+        self::assertFalse($this->connection->query('SELECT is_exhausted FROM projects WHERE id = 1')->fetchColumn());
+        $this->assertRejectsSql('UPDATE projects SET is_exhausted = TRUE WHERE id = 1', '23514');
+        $this->connection->exec('UPDATE projects SET has_allocated_build_number = TRUE, is_exhausted = TRUE WHERE id = 1');
+        self::assertTrue($this->connection->query('SELECT is_exhausted FROM projects WHERE id = 1')->fetchColumn());
+        $this->assertRejectsSql('UPDATE projects SET next_build_number = 4294967294 WHERE id = 1', '23514');
+        $this->assertRejectsSql('UPDATE projects SET has_allocated_build_number = FALSE WHERE id = 1', '23514');
+    }
+
+    /**
      * Creates two projects and users for relationship checks.
      *
      * @return void
