@@ -368,9 +368,64 @@ final class DeviceServiceTest extends TestCase
         }
     }
 
+    /**
+     * Exposes protected forms and shows the issued secret only in the creation response.
+     *
+     * @return void
+     */
+    public function testProtectsDeviceFormsAndOneTimeSecret(): void
+    {
+        $secret = $this->signIn();
+        $session = $this->application->sessions->authenticate($secret);
+        $project = $this->application->projects->createProject($session, 1, '77', '<Project>');
+        $router = new \Ordinal\Http\Router($this->application);
+        $cookies = [\Ordinal\Service\BrowserSessionService::COOKIE_NAME => $secret];
+        self::assertSame(401, $router->dispatch('GET', '/devices', cookies: [], isSecure: true)->statusCode);
+        self::assertSame(400, $router->dispatch('GET', '/devices', cookies: $cookies)->statusCode);
+        $fields = ['projectId' => (string) $project, 'name' => '<Laptop>', 'deviceId' => ''];
+        self::assertSame(403, $router->dispatch('POST', '/devices/enroll', http_build_query($fields), null, 'application/x-www-form-urlencoded', $cookies, true)->statusCode);
+        self::assertSame(0, (int) $this->connection->query('SELECT count(*) FROM devices')->fetchColumn());
+        $fields['csrfToken'] = $session->csrfToken;
+        $created = $router->dispatch('POST', '/devices/enroll', http_build_query($fields), null, 'application/x-www-form-urlencoded', $cookies, true);
+        self::assertSame(200, $created->statusCode, $created->body);
+        self::assertSame('no-store', $created->headers['Cache-Control']);
+        self::assertSame('no-referrer', $created->headers['Referrer-Policy']);
+        self::assertMatchesRegularExpression('/device\.[1-9][0-9]*\.[a-f0-9]{64}/', $created->body);
+        $page = $router->dispatch('GET', '/devices', cookies: $cookies, isSecure: true);
+        self::assertSame(200, $page->statusCode);
+        self::assertStringContainsString('&lt;Laptop&gt;', $page->body);
+        self::assertStringNotContainsString('<Laptop>', $page->body);
+        self::assertDoesNotMatchRegularExpression('/device\.[1-9][0-9]*\.[a-f0-9]{64}/', $page->body);
+        $response = $router->dispatch('POST', '/devices/revoke', http_build_query(['csrfToken' => $session->csrfToken, 'action' => 'device', 'deviceId' => '1']), null, 'application/x-www-form-urlencoded', $cookies, true);
+        self::assertSame(303, $response->statusCode);
+        self::assertNotNull($this->connection->query('SELECT revoked_at FROM devices')->fetchColumn());
+    }
 
-
-
+    /**
+     * Allows policy changes only through CSRF-protected instance administration forms.
+     *
+     * @return void
+     */
+    public function testChangesAuthenticationPolicyThroughBrowserForms(): void
+    {
+        $secret = $this->signIn();
+        $session = $this->application->sessions->authenticate($secret);
+        $project = $this->application->projects->createProject($session, 1, '77', 'Project');
+        $router = new \Ordinal\Http\Router($this->application);
+        $cookies = [\Ordinal\Service\BrowserSessionService::COOKIE_NAME => $secret];
+        $fields = ['csrfToken' => $session->csrfToken, 'projectId' => (string) $project, 'isRequired' => 'inherit', 'lifetimeDays' => '0'];
+        $response = $router->dispatch('POST', '/devices/policy', http_build_query($fields), null, 'application/x-www-form-urlencoded', $cookies, true);
+        self::assertSame(303, $response->statusCode, $response->body);
+        self::assertSame(0, (int) $this->connection->query('SELECT device_lifetime_days_override FROM projects')->fetchColumn());
+        $fields['lifetimeDays'] = 'inherit';
+        self::assertSame(303, $router->dispatch('POST', '/devices/policy', http_build_query($fields), null, 'application/x-www-form-urlencoded', $cookies, true)->statusCode);
+        self::assertNull($this->connection->query('SELECT device_lifetime_days_override FROM projects')->fetchColumn());
+        foreach (['-2', '1.5', '00', (string) PHP_INT_MAX] as $invalid) {
+            $fields['lifetimeDays'] = $invalid;
+            self::assertSame(400, $router->dispatch('POST', '/devices/policy', http_build_query($fields), null, 'application/x-www-form-urlencoded', $cookies, true)->statusCode);
+        }
+        self::assertSame(200, $router->dispatch('GET', '/projects/' . $project, cookies: $cookies, isSecure: true)->statusCode);
+    }
 
     /**
      * Serializes independent lifetime-zero workers so exactly one distinct request succeeds.

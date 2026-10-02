@@ -6,7 +6,11 @@ The idea is to keep the numbers in one place. If two builds start at the same ti
 
 I am building this step by step, starting with teh backend. The frontend comes later and should stay simple. The website will use HTML, CSS, TypeScript, PHP and PostgreSQL, with GitHub and GitLab for sign in and repository access.
 
-Right now the test setup is ready. The website itself is not implemented yet.
+The backend can now sign in through GitHub and GitLab, link repositories to projects and allocate build numbers. Retrying the same request returns its original number. There are simple account and administration pages, without CSS yet.
+
+Devices can get their own project credentials. The secret is shown once and only its hash is stored. Lifetimes can be positive days, 0 for one allocation, or -1 without expiration. Credentials and whole devices can be revoked. Developer requests still check repository write access, including retries.
+
+CI tokens, the remaining counter and history controls, deployment checks and the frontend are still coming. The provider tests use mocked responses, so live GitHub and GitLab verification is still open.
 
 ## Running the tests
 

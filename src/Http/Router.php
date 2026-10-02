@@ -24,6 +24,10 @@ final class Router
         '/administration' => ['GET' => 'GET/administration.php', 'POST' => 'POST/administration.php'],
         '/projects' => ['GET' => 'GET/projects.php', 'POST' => 'POST/projects.php'],
         '/projects/{projectId}' => ['GET' => 'GET/project.php'],
+        '/devices' => ['GET' => 'GET/devices.php'],
+        '/devices/enroll' => ['POST' => 'POST/device-enrollment.php'],
+        '/devices/revoke' => ['POST' => 'POST/device-revocation.php'],
+        '/devices/policy' => ['POST' => 'POST/authentication-policy.php'],
     ];
     /** Bounds browser form bodies before parsing request fields. */
     private const int MAX_FORM_BYTES = 65_536;
