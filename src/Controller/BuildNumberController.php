@@ -82,7 +82,7 @@ final class BuildNumberController
 
         try {
             $caller      = $this->authorizer->authorizeAllocation($parsedProjectId, $bearerToken);
-            $requestId   = $request->requestId;
+            $requestId   = strtolower($request->requestId);
             $service     = $this->service ?? new BuildNumberService(
                 ConnectionFactory::createConnection(ConfigurationLoader::loadFromEnvironment()),
             );

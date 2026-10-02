@@ -60,7 +60,22 @@ final class BuildNumberControllerTest extends TestCase
         }
     }
 
-
+    /**
+     * Returns the stable API envelope and normalizes UUID hex casing for replay.
+     *
+     * @return void
+     */
+    public function testReturnsAllocationAndDelayedReplay(): void
+    {
+        $first = $this->submitRequest(strtoupper(self::FIRST_REQUEST));
+        self::assertSame(200, $first->statusCode);
+        self::assertSame(['projectId' => 1, 'requestId' => self::FIRST_REQUEST, 'buildNumber' => 1],
+            json_decode($first->body, true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(2, json_decode($this->submitRequest(self::SECOND_REQUEST)->body, true, flags: JSON_THROW_ON_ERROR)['buildNumber']);
+        self::assertSame($first->body, $this->submitRequest(self::FIRST_REQUEST)->body);
+        self::assertSame('application/json; charset=UTF-8', $first->headers['Content-Type']);
+        self::assertSame('no-store', $first->headers['Cache-Control']);
+    }
 
     /**
      * Preserves permanent retry records after audit cleanup and simulated counter reset.
