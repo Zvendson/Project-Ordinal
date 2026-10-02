@@ -28,6 +28,8 @@ final class Router
         '/devices/enroll' => ['POST' => 'POST/device-enrollment.php'],
         '/devices/revoke' => ['POST' => 'POST/device-revocation.php'],
         '/devices/policy' => ['POST' => 'POST/authentication-policy.php'],
+        '/automation' => ['GET' => 'GET/automation.php', 'POST' => 'POST/automation.php'],
+        '/automation/policy' => ['POST' => 'POST/automation-policy.php'],
     ];
     /** Bounds browser form bodies before parsing request fields. */
     private const int MAX_FORM_BYTES = 65_536;

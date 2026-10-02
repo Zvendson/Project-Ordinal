@@ -19,7 +19,7 @@ final class TemplateRenderer
      */
     public function renderAccountPage(string $page, #[SensitiveParameter] array $data): string
     {
-        $templates = ['login' => 'login.php', 'account' => 'account.php', 'administration' => 'administration.php', 'projects' => 'projects.php', 'project' => 'project.php', 'devices' => 'devices.php', 'device-credential' => 'device-credential.php'];
+        $templates = ['login' => 'login.php', 'account' => 'account.php', 'administration' => 'administration.php', 'projects' => 'projects.php', 'project' => 'project.php', 'devices' => 'devices.php', 'device-credential' => 'device-credential.php', 'automation' => 'automation.php', 'automation-secret' => 'automation-secret.php'];
         if (!isset($templates[$page])) {
             throw new \InvalidArgumentException('Unknown account template.');
         }

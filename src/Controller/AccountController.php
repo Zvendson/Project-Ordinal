@@ -74,6 +74,9 @@ final class AccountController
                 'enrollDevice' => $this->enrollDevice($fields, $cookies),
                 'revokeDevice' => $this->revokeDevice($fields, $cookies),
                 'saveAuthenticationPolicy' => $this->saveAuthenticationPolicy($fields, $cookies),
+                'showAutomation' => $this->showAutomation($query, $cookies),
+                'saveAutomation' => $this->saveAutomation($fields, $cookies),
+                'saveAutomationPolicy' => $this->saveAutomationPolicy($fields, $cookies),
                 default => $this->createError('Page not found.', 404),
             };
         } catch (AuthenticationException | ProviderAuthenticationException) {
@@ -300,6 +303,62 @@ final class AccountController
         }
         $this->application->devices->saveAuthenticationPolicy($session, $projectId, $isRequired === 'inherit' ? null : $isRequired === '1', $days === 'inherit' ? null : (int) $days);
         return $this->redirect($projectId === null ? '/administration' : '/projects/' . $projectId);
+    }
+
+    /**
+     * Displays only current project-administrator token metadata and protected forms.
+     *
+     * @param array $query
+     * @param array $cookies
+     * @return Response
+     */
+    private function showAutomation(array $query, #[SensitiveParameter] array $cookies): Response
+    {
+        $session = $this->getSession($cookies);
+        $projectId = $this->getPositiveInteger($query, 'projectId');
+        return $this->renderPage('automation', $this->application->automation->getProjectTokens($session, $projectId) + ['session' => $session, 'projectId' => $projectId]);
+    }
+
+    /**
+     * Delegates CSRF-protected token mutations and displays secrets only for creation/rotation.
+     *
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function saveAutomation(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $projectId = $this->getPositiveInteger($fields, 'projectId');
+        switch ($this->getString($fields, 'action')) {
+            case 'create':
+                return $this->renderPage('automation-secret', $this->application->automation->createToken($session, $projectId, $this->getString($fields, 'name'), $this->getBoolean($fields, 'hasNoExpiration')));
+            case 'rotate':
+                return $this->renderPage('automation-secret', $this->application->automation->rotateToken($session, $this->getPositiveInteger($fields, 'tokenId'), $this->getBoolean($fields, 'hasNoExpiration')));
+            case 'rename':
+                $this->application->automation->renameToken($session, $this->getPositiveInteger($fields, 'tokenId'), $this->getString($fields, 'name'));
+                break;
+            case 'revoke':
+                $this->application->automation->revokeToken($session, $this->getPositiveInteger($fields, 'tokenId'));
+                break;
+            default:
+                throw new AccountException('The request is invalid.', 400);
+        }
+        return $this->redirect('/automation?projectId=' . $projectId);
+    }
+
+    /**
+     * Changes future CI policy only through instance administration and CSRF validation.
+     *
+     * @param array $fields
+     * @param array $cookies
+     * @return Response
+     */
+    private function saveAutomationPolicy(#[SensitiveParameter] array $fields, #[SensitiveParameter] array $cookies): Response
+    {
+        $session = $this->getFormSession($fields, $cookies);
+        $this->application->automation->savePolicy($session, $this->getPositiveInteger($fields, 'lifetimeDays'), $this->getBoolean($fields, 'isWithoutExpirationAllowed'));
+        return $this->redirect('/administration');
     }
 
     /**

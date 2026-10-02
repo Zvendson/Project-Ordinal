@@ -19,6 +19,14 @@ $csrfToken = TemplateRenderer::escape($data['session']->csrfToken);
     <p><label>Device lifetime in days <input name="lifetimeDays" value="<?= (int) $data['settings']['device_lifetime_days'] ?>" required></label></p>
     <button type="submit">Save authentication defaults</button>
 </form>
+<h3>Automation token policy</h3>
+<p>Changes apply to creation and rotation. Existing tokens retain their expiry. Device authentication lifetime is separate.</p>
+<form method="post" action="/automation/policy">
+    <input type="hidden" name="csrfToken" value="<?= $csrfToken ?>">
+    <p><label>Default lifetime in days <input name="lifetimeDays" value="<?= (int) $data['settings']['automation_lifetime_days'] ?>" inputmode="numeric" required></label></p>
+    <p><label>Tokens without expiration <select name="isWithoutExpirationAllowed"><option value="0"<?= !$data['settings']['is_automation_without_expiration_allowed'] ? ' selected' : '' ?>>Disabled</option><option value="1"<?= $data['settings']['is_automation_without_expiration_allowed'] ? ' selected' : '' ?>>Allowed</option></select></label></p>
+    <button type="submit">Save automation policy</button>
+</form>
 <h3>Provider connections</h3>
 <p>Registration credentials are managed by the server operator. Choose a configured registration to allow it here.</p>
 <ul>

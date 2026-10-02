@@ -9,6 +9,7 @@ use Ordinal\View\TemplateRenderer;
 <h2><?= TemplateRenderer::escape($data['project']['name']) ?></h2>
 <p>Provider connection: <?= (int) $data['project']['provider_connection_id'] ?>. Repository ID: <?= TemplateRenderer::escape($data['project']['provider_repository_id']) ?>.</p>
 <p>Current access: <?= $data['permissions']->canAdministerProject ? 'project administration' : 'contributor' ?>.</p>
+<?php if ($data['permissions']->canAdministerProject): ?><p><a href="/automation?projectId=<?= (int) $data['project']['id'] ?>">Manage automation tokens</a></p><?php endif; ?>
 <h3>Build authentication</h3>
 <p>Authentication: <?= $data['project']['is_authentication_required'] ? 'required' : 'disabled (anonymous allocation)' ?>. Effective device lifetime: <?= (int) $data['project']['device_lifetime_days'] ?> days.</p>
 <p>Positive days expire from provider sign-in. 0 allows one allocation and its replay. -1 has no time expiration. Policy changes apply to new credentials; existing credentials keep their assigned expiration.</p>
