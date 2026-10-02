@@ -437,6 +437,38 @@ final class AutomationServiceTest extends TestCase
     }
 
     /**
+     * Expiration during a project lock wait rejects new requests and permanent replays.
+     *
+     * @return void
+     */
+    public function testRejectsTokenThatExpiresWhileWaitingForProject(): void
+    {
+        $session = $this->signInAdministrator();
+        $project = $this->application->projects->createProject($session, 1, '77', 'Project');
+        $token = $this->application->automation->createToken($session, $project, 'CI');
+        self::assertSame(1, $this->allocate($project, $token['token'], 1));
+        $this->connection->exec("UPDATE automation_tokens SET expires_at = clock_timestamp() + interval '2 seconds'");
+        $parsed = \Ordinal\Security\AutomationToken::parseToken($token['token']);
+        $hash = hash('sha256', $parsed['secret']);
+        $scripts = [];
+        for ($index = 1; $index <= 2; $index++) {
+            $scripts[] = 'require ' . var_export(dirname(__DIR__, 2) . '/vendor/autoload.php', true) . '; echo \\Ordinal\\Tests\\Support\\AutomationAllocationWorker::allocate(' . var_export($this->schemaName, true) . ', ' . $token['id'] . ', ' . var_export($hash, true) . ', ' . var_export($this->createRequestId($index), true) . ');';
+        }
+        $this->connection->beginTransaction();
+        $this->connection->query('SELECT id FROM projects WHERE id = 1 FOR UPDATE')->fetchColumn();
+        $outputs = \Ordinal\Tests\Support\ConcurrentAllocations::run($this->connection, $this->schemaName, $scripts,
+            /** Waits until the assigned expiry passes before releasing the project. @return void */
+            function (): void {
+                $this->connection->query('SELECT pg_sleep(GREATEST(0, EXTRACT(EPOCH FROM (expires_at - clock_timestamp()))::double precision) + 0.1) FROM automation_tokens');
+            },
+        );
+        self::assertSame(['INVALID_AUTHENTICATION', 'INVALID_AUTHENTICATION'], $outputs);
+        self::assertSame(1, (int) $this->connection->query('SELECT count(*) FROM allocations')->fetchColumn());
+        self::assertSame(2, (int) $this->connection->query('SELECT next_build_number FROM projects')->fetchColumn());
+        self::assertSame(0, (int) $this->connection->query("SELECT count(*) FROM audit_events WHERE outcome = 'replayed'")->fetchColumn());
+    }
+
+    /**
      * Failed audit persistence rolls back both token issuance and secret rotation.
      *
      * @return void

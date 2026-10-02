@@ -68,6 +68,14 @@ final class BuildNumberService
                 if ($project === null || $project['archived_at'] !== null || $project['disabled_at'] !== null) {
                     throw new AllocationException(AllocationException::PROJECT_NOT_FOUND);
                 }
+                // Re-evaluate expiry after the project lock wait, while credential locks remain held.
+                if ($caller->automationTokenId !== null) {
+                    $automation->requireActiveToken($automation->findToken($caller->automationTokenId), $projectId, $caller->automationSecretHash);
+                }
+                if ($caller->deviceCredentialId !== null) {
+                    $credential = $devices->findCredential($caller->deviceCredentialId);
+                    $devices->requireActiveCredential($credential, $projectId, $caller->userId);
+                }
                 if ($caller->getKind() === AllocationCaller::ANONYMOUS && $project['is_authentication_required']) {
                     throw new AllocationException(AllocationException::INVALID_AUTHENTICATION);
                 }

@@ -650,6 +650,37 @@ final class DeviceServiceTest extends TestCase
     }
 
     /**
+     * Absolute device expiry during a project lock wait rejects allocations and saved replays.
+     *
+     * @return void
+     */
+    public function testRejectsCredentialThatExpiresWhileWaitingForProject(): void
+    {
+        $session = $this->signInAdministrator();
+        $project = $this->application->projects->createProject($session, 1, '77', 'Project');
+        $credential = $this->application->devices->enrollDevice($session, $project, 'Device');
+        $caller = $this->application->allocationAuthorizer->authorizeAllocation($project, $credential['token']);
+        self::assertSame(1, $this->application->buildNumbers->allocateBuildNumber($project, $this->createRequestId(1), $caller));
+        $this->connection->exec("UPDATE device_credentials SET authenticated_at = statement_timestamp() - interval '30 days' + interval '2 seconds', provider_sign_in_at = statement_timestamp() - interval '30 days' + interval '2 seconds', expires_at = statement_timestamp() + interval '2 seconds'");
+        $scripts = [];
+        for ($index = 1; $index <= 2; $index++) {
+            $scripts[] = 'require ' . var_export(dirname(__DIR__, 2) . '/vendor/autoload.php', true) . '; echo \\Ordinal\\Tests\\Support\\DeviceAllocationWorker::allocate(' . var_export($this->schemaName, true) . ', ' . $credential['credentialId'] . ', ' . $session->userId . ', ' . var_export($this->createRequestId($index), true) . ');';
+        }
+        $this->connection->beginTransaction();
+        $this->connection->query('SELECT id FROM projects WHERE id = 1 FOR UPDATE')->fetchColumn();
+        $outputs = \Ordinal\Tests\Support\ConcurrentAllocations::run($this->connection, $this->schemaName, $scripts,
+            /** Waits until absolute expiry passes before releasing the project. @return void */
+            function (): void {
+                $this->connection->query('SELECT pg_sleep(GREATEST(0, EXTRACT(EPOCH FROM (expires_at - clock_timestamp()))::double precision) + 0.1) FROM device_credentials');
+            },
+        );
+        self::assertSame(['INVALID_AUTHENTICATION', 'INVALID_AUTHENTICATION'], $outputs);
+        self::assertSame(1, (int) $this->connection->query('SELECT count(*) FROM allocations')->fetchColumn());
+        self::assertSame(2, (int) $this->connection->query('SELECT next_build_number FROM projects')->fetchColumn());
+        self::assertSame(0, (int) $this->connection->query("SELECT count(*) FROM audit_events WHERE outcome = 'replayed'")->fetchColumn());
+    }
+
+    /**
      * Calls the real routed API with trusted HTTPS context.
      *
      * @param int $projectId
